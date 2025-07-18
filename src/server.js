@@ -14,6 +14,7 @@ import { handleMatchmaking } from "./sockets/matchmaking.socket.js";
 import { handleBossPreview } from "./sockets/boss-preview.socket.js";
 import userRoutes from "./routes/user.routes.js";
 import eventRoutes from "./routes/event.routes.js";
+import publicEventRoutes from "./routes/public-event.routes.js";
 import categoryRoutes from "./routes/category.routes.js";
 import questionRoutes from "./routes/question.routes.js";
 import bossRoutes from "./routes/boss.routes.js";
@@ -53,6 +54,7 @@ app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
 // });
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/public/events", publicEventRoutes); // Public events route (no auth required)
 app.use("/api/events", eventRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/questions", questionRoutes);

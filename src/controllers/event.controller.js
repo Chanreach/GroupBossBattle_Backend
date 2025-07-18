@@ -463,6 +463,69 @@ const generateBossQRCode = async (req, res) => {
   }
 };
 
+// Public events endpoint (no authentication required)
+const getPublicEvents = async (req, res) => {
+  try {
+    const events = await Event.findAll({
+      include: [
+        {
+          model: User,
+          as: "creator",
+          attributes: ["id", "username"], // Only include basic creator info
+        },
+        {
+          model: EventBoss,
+          as: "eventBosses",
+          include: [
+            {
+              model: Boss,
+              as: "boss",
+              attributes: [
+                "id",
+                "name",
+                "image",
+                "description",
+                "numberOfTeams",
+              ],
+              include: [
+                {
+                  model: Category,
+                  as: "Categories",
+                  through: { attributes: [] }
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: 10, // Limit for performance
+    });
+
+    // Update status and format datetime for each event
+    const eventsWithStatus = await Promise.all(
+      events.map(async (event) => {
+        const currentStatus = updateEventStatus(event);
+
+        // Update status in database if it has changed
+        if (event.status !== currentStatus) {
+          await event.update({ status: currentStatus });
+        }
+
+        return {
+          ...event.toJSON(),
+          status: currentStatus,
+        };
+      })
+    );
+
+    res.status(200).json(eventsWithStatus);
+  } catch (error) {
+    console.error("Error fetching public events:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 export default {
   getAllEvents,
   getEventById,
@@ -472,4 +535,5 @@ export default {
   assignBossesToEvent,
   unassignBossFromEvent,
   generateBossQRCode,
+  getPublicEvents,
 };
