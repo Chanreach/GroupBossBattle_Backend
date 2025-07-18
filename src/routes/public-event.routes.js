@@ -3,7 +3,8 @@ import eventController from "../controllers/event.controller.js";
 
 const router = express.Router();
 
-// Public route - no authentication required
+// Public routes - no authentication required
 router.get("/", eventController.getPublicEvents);
+router.get("/:id", eventController.getPublicEventById);
 
 export default router;

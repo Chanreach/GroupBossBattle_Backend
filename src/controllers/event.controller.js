@@ -526,6 +526,67 @@ const getPublicEvents = async (req, res) => {
   }
 };
 
+// Public event by ID endpoint (no authentication required)
+const getPublicEventById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const event = await Event.findByPk(id, {
+      include: [
+        {
+          model: User,
+          as: "creator",
+          attributes: ["id", "username"], // Only include basic creator info
+        },
+        {
+          model: EventBoss,
+          as: "eventBosses",
+          include: [
+            {
+              model: Boss,
+              as: "boss",
+              attributes: [
+                "id",
+                "name",
+                "image",
+                "description",
+                "cooldownDuration",
+                "numberOfTeams",
+              ],
+              include: [
+                {
+                  model: Category,
+                  as: "Categories",
+                  through: { attributes: [] }
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    // Update status based on current time
+    const currentStatus = updateEventStatus(event);
+    if (event.status !== currentStatus) {
+      await event.update({ status: currentStatus });
+    }
+
+    const eventWithStatus = {
+      ...event.toJSON(),
+      status: currentStatus,
+    };
+
+    res.status(200).json(eventWithStatus);
+  } catch (error) {
+    console.error("Error fetching public event:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 export default {
   getAllEvents,
   getEventById,
@@ -536,4 +597,5 @@ export default {
   unassignBossFromEvent,
   generateBossQRCode,
   getPublicEvents,
+  getPublicEventById,
 };
