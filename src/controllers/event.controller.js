@@ -1,4 +1,4 @@
-import { Event, User, Boss, EventBoss } from "../models/index.js";
+import { Event, User, Boss, EventBoss, Category } from "../models/index.js";
 import { Op } from "sequelize";
 import { generateUniqueJoinCode } from "../utils/generateJoinCode.js";
 import { generateBossJoinQRCode } from "../utils/qrCodeGenerator.js";
@@ -52,6 +52,11 @@ const getAllEvents = async (req, res) => {
                   model: User,
                   as: "creator",
                   attributes: ["id", "username"],
+                },
+                {
+                  model: Category,
+                  as: "Categories",
+                  through: { attributes: [] }
                 },
               ],
             },
@@ -116,6 +121,11 @@ const getEventById = async (req, res) => {
                   model: User,
                   as: "creator",
                   attributes: ["id", "username"],
+                },
+                {
+                  model: Category,
+                  as: "Categories",
+                  through: { attributes: [] }
                 },
               ],
             },
@@ -330,6 +340,11 @@ const assignBossesToEvent = async (req, res) => {
               model: User,
               as: "creator",
               attributes: ["id", "username"],
+            },
+            {
+              model: Category,
+              as: "Categories",
+              through: { attributes: [] }
             },
           ],
         },
