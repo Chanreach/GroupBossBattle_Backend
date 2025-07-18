@@ -56,7 +56,7 @@ const getAllEvents = async (req, res) => {
                 {
                   model: Category,
                   as: "Categories",
-                  through: { attributes: [] }
+                  through: { attributes: [] },
                 },
               ],
             },
@@ -125,7 +125,7 @@ const getEventById = async (req, res) => {
                 {
                   model: Category,
                   as: "Categories",
-                  through: { attributes: [] }
+                  through: { attributes: [] },
                 },
               ],
             },
@@ -165,8 +165,28 @@ const createEvent = async (req, res) => {
       .json({ message: "Name, start time, and end time are required" });
   }
 
+  if (new Date(startTime) >= new Date(endTime)) {
+    return res
+      .status(400)
+      .json({ message: "End time must be after start time" });
+  }
+
   // Store as received from user - no validation or conversion
   try {
+    // Check if event with the same name already exists for this user
+    const existingEvent = await Event.findOne({
+      where: {
+        name,
+        creatorId: req.user.id,
+      },
+    });
+
+    if (existingEvent) {
+      return res
+        .status(409)
+        .json({ message: "Event with this name already exists" });
+    }
+
     // Store the times as received from user (no conversion)
     const eventData = {
       name,
@@ -196,9 +216,21 @@ const updateEvent = async (req, res) => {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    // Update with raw values from request
-    if (startTime) {
-      event.startTime = startTime;
+    // Check if the event name already exists for this user
+    if (name && name !== event.name) {
+      const existingEvent = await Event.findOne({
+        where: {
+          name,
+          creatorId: req.user.id,
+          id: { [Op.ne]: id }, // Exclude current event
+        },
+      });
+
+      if (existingEvent) {
+        return res
+          .status(409)
+          .json({ message: "Event with this name already exists" });
+      }
     }
 
     if (endTime) {
@@ -344,7 +376,7 @@ const assignBossesToEvent = async (req, res) => {
             {
               model: Category,
               as: "Categories",
-              through: { attributes: [] }
+              through: { attributes: [] },
             },
           ],
         },
@@ -491,7 +523,7 @@ const getPublicEvents = async (req, res) => {
                 {
                   model: Category,
                   as: "Categories",
-                  through: { attributes: [] }
+                  through: { attributes: [] },
                 },
               ],
             },
@@ -556,7 +588,7 @@ const getPublicEventById = async (req, res) => {
                 {
                   model: Category,
                   as: "Categories",
-                  through: { attributes: [] }
+                  through: { attributes: [] },
                 },
               ],
             },

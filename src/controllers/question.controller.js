@@ -51,14 +51,14 @@ const validateQuestionData = (questionText, answerChoices, timeLimit) => {
 const getAllQuestions = async (req, res) => {
   try {
     const filter = req.questionFilter || {};
-    const { categoryId, page = 1, limit = 10 } = req.query;
+    const { categoryId } = req.query;
 
     // Add category filter if provided
     if (categoryId) {
       filter.categoryId = categoryId;
     }
 
-    const offset = (page - 1) * limit;
+    // const offset = (page - 1) * limit;
 
     const questions = await Question.findAndCountAll({
       where: filter,
@@ -79,15 +79,15 @@ const getAllQuestions = async (req, res) => {
         },
       ],
       order: [["createdAt", "DESC"]],
-      limit: parseInt(limit),
-      offset,
+      // limit: parseInt(limit),
+      // offset,
     });
 
     res.status(200).json({
       questions: questions.rows,
       totalCount: questions.count, // This is now correctly filtered by categoryId if provided
-      currentPage: parseInt(page),
-      totalPages: Math.ceil(questions.count / limit),
+      // currentPage: parseInt(page),
+      // totalPages: Math.ceil(questions.count / limit),
     });
   } catch (error) {
     console.error("Error fetching questions:", error);

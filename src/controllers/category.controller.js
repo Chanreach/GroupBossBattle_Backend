@@ -4,9 +4,9 @@ import { Op } from "sequelize";
 const getAllCategories = async (req, res) => {
   try {
     const filter = req.categoryFilter || {};
-    const { page = 1, limit = 10 } = req.query;
+    // const { page = 1, limit = 10 } = req.query;
 
-    const offset = (page - 1) * limit;
+    // const offset = (page - 1) * limit;
 
     const categories = await Category.findAndCountAll({
       where: filter,
@@ -18,15 +18,15 @@ const getAllCategories = async (req, res) => {
         },
       ],
       order: [["createdAt", "DESC"]],
-      limit: parseInt(limit),
-      offset,
+      // limit: parseInt(limit),
+      // offset,
     });
 
     res.status(200).json({
       categories: categories.rows,
       totalCount: categories.count,
-      currentPage: parseInt(page),
-      totalPages: Math.ceil(categories.count / limit),
+      // currentPage: parseInt(page),
+      // totalPages: Math.ceil(categories.count / limit),
     });
   } catch (error) {
     console.error("Error fetching categories:", error);
