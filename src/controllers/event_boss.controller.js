@@ -83,9 +83,45 @@ const deleteEventBoss = async (req, res) => {
   }
 }
 
+const getEventBossByJoinCode = async (req, res) => {
+  const { joinCode } = req.params;
+  try {
+    const eventBoss = await EventBoss.findOne({
+      where: { joinCode },
+      include: ['boss', 'event'] // Include related Boss and Event data
+    });
+    
+    if (!eventBoss) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Boss not found with this join code" 
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        id: eventBoss.id,
+        event_id: eventBoss.eventId,
+        boss_id: eventBoss.bossId,
+        joinCode: eventBoss.joinCode,
+        boss: eventBoss.boss,
+        event: eventBoss.event
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching event boss by join code:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Internal server error" 
+    });
+  }
+}
+
 export default {
   getAllEventBosses,
   getEventBossById,
+  getEventBossByJoinCode,
   createEventBoss,
   updateEventBoss,
   deleteEventBoss

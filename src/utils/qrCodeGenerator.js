@@ -73,7 +73,7 @@ export async function generateQRCodeFile(text, filename, outputDir = './uploads/
  */
 export async function generateBossJoinQRCode(joinCode, baseURL = process.env.FRONTEND_URL || 'http://localhost:5173') {
   try {
-    const joinURL = `${baseURL}/player/join?code=${joinCode}`;
+    const joinURL = `${baseURL}/boss-preview/join?code=${joinCode}`;
     
     const qrCodeOptions = {
       width: 300,

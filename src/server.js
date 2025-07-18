@@ -11,12 +11,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import { handleMatchmaking } from "./sockets/matchmaking.socket.js";
+import { handleBossPreview } from "./sockets/boss-preview.socket.js";
 import userRoutes from "./routes/user.routes.js";
 import eventRoutes from "./routes/event.routes.js";
 import categoryRoutes from "./routes/category.routes.js";
 import questionRoutes from "./routes/question.routes.js";
 import bossRoutes from "./routes/boss.routes.js";
 import eventBossRoutes from "./routes/event_boss.routes.js";
+import bossPreviewRoutes from "./routes/bosspreview.routes.js";
 import joinRoutes from "./routes/join.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 
@@ -31,7 +33,7 @@ const server = http.createServer(app);
 
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "*",
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
@@ -56,6 +58,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/questions", questionRoutes);
 app.use("/api/bosses", bossRoutes);
 app.use("/api/event-bosses", eventBossRoutes);
+app.use("/api/boss-preview", bossPreviewRoutes);
 app.use("/api/join", joinRoutes);
 
 const io = new Server(server, {
@@ -71,6 +74,9 @@ io.on("connection", (socket) => {
 
   // Setup matchmaking
   handleMatchmaking(io, socket);
+
+  // Setup boss preview
+  handleBossPreview(io, socket);
 
   // Global disconnect handling
   socket.on("disconnect", (reason) => {
