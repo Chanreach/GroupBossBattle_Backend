@@ -33,9 +33,13 @@ const EventBoss = sequelize.define(
       defaultValue: 2,
     },
     status: {
-      type: DataTypes.ENUM("active", "cooldown"),
+      type: DataTypes.ENUM("active", "in-battle", "cooldown"),
       allowNull: false,
       defaultValue: "active",
+    },
+    cooldownEndTime: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
   },
   {

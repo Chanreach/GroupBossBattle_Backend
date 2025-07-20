@@ -14,7 +14,9 @@ const getAllEventBosses = async (req, res) => {
 const getEventBossById = async (req, res) => {
   const { id } = req.params;
   try {
-    const boss = await EventBoss.findByPk(id);
+    const boss = await EventBoss.findByPk(id, {
+      include: ['boss', 'event']
+    });
     if (!boss) {
       return res.status(404).json({ message: "Event boss not found" });
     }
@@ -118,11 +120,46 @@ const getEventBossByJoinCode = async (req, res) => {
   }
 }
 
+const updateEventBossStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status, cooldownEndTime } = req.body;
+
+  try {
+    const eventBoss = await EventBoss.findByPk(id);
+    if (!eventBoss) {
+      return res.status(404).json({ message: "Event boss not found" });
+    }
+
+    // Update the status and cooldown end time
+    await eventBoss.update({
+      status,
+      cooldownEndTime: cooldownEndTime || null
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Boss status updated successfully",
+      eventBoss: {
+        id: eventBoss.id,
+        status: eventBoss.status,
+        cooldownEndTime: eventBoss.cooldownEndTime
+      }
+    });
+  } catch (error) {
+    console.error("Error updating event boss status:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Internal server error" 
+    });
+  }
+}
+
 export default {
   getAllEventBosses,
   getEventBossById,
   getEventBossByJoinCode,
   createEventBoss,
   updateEventBoss,
+  updateEventBossStatus,
   deleteEventBoss
 };
