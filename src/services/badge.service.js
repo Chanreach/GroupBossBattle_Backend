@@ -13,8 +13,13 @@ class BadgeService {
     }
   }
 
-  // Award MVP badge (most damage in boss fight)
-  static async awardMVPBadge(playerId, bossSessionId, totalDamage) {
+  // Award MVP badge (most damage in boss fight) - Updated for simplified schema
+  static async awardMVPBadge(
+    playerId,
+    eventBossId,
+    totalDamage,
+    eventId = null
+  ) {
     try {
       const mvpBadge = await Badge.findOne({ where: { name: "MVP" } });
       if (!mvpBadge) {
@@ -22,18 +27,18 @@ class BadgeService {
         return null;
       }
 
-      // Check if player already has this badge for this boss session
+      // Check if player already has this badge for this event boss
       const existingBadge = await UserBadge.findOne({
         where: {
           playerId,
           badgeId: mvpBadge.id,
-          bossSessionId: bossSessionId,
+          eventBossId: eventBossId,
         },
       });
 
       if (existingBadge) {
         console.log(
-          `Player ${playerId} already has MVP badge for boss session ${bossSessionId}`
+          `Player ${playerId} already has MVP badge for event boss ${eventBossId}`
         );
         return existingBadge;
       }
@@ -42,21 +47,30 @@ class BadgeService {
       const userBadge = await UserBadge.create({
         playerId,
         badgeId: mvpBadge.id,
-        bossSessionId: bossSessionId,
+        eventBossId: eventBossId,
+        eventId: eventId || 1, // Default to 1 if not provided
       });
 
       console.log(
-        `🏆 MVP badge awarded to player ${playerId} for boss session ${bossSessionId} with ${totalDamage} damage`
+        `🏆 MVP badge awarded to player ${playerId} for event boss ${eventBossId} with ${totalDamage} damage`
       );
-      return userBadge;
+      console.log(
+        `🏆 [FRONTEND] MVP Badge: ${mvpBadge.name}, Player: ${playerId}, Damage: ${totalDamage}`
+      );
+
+      return {
+        userBadge,
+        badgeInfo: mvpBadge,
+        totalDamage,
+      };
     } catch (error) {
       console.error("Error awarding MVP badge:", error);
       throw error;
     }
   }
 
-  // Award Last Hit badge (final blow to boss)
-  static async awardLastHitBadge(playerId, bossSessionId) {
+  // Award Last Hit badge (final blow to boss) - Updated for simplified schema
+  static async awardLastHitBadge(playerId, eventBossId, eventId = null) {
     try {
       const lastHitBadge = await Badge.findOne({ where: { name: "Last Hit" } });
       if (!lastHitBadge) {
@@ -64,18 +78,18 @@ class BadgeService {
         return null;
       }
 
-      // Check if player already has this badge for this boss session
+      // Check if player already has this badge for this event boss
       const existingBadge = await UserBadge.findOne({
         where: {
           playerId,
           badgeId: lastHitBadge.id,
-          bossSessionId: bossSessionId,
+          eventBossId: eventBossId,
         },
       });
 
       if (existingBadge) {
         console.log(
-          `Player ${playerId} already has Last Hit badge for boss session ${bossSessionId}`
+          `Player ${playerId} already has Last Hit badge for event boss ${eventBossId}`
         );
         return existingBadge;
       }
@@ -84,21 +98,33 @@ class BadgeService {
       const userBadge = await UserBadge.create({
         playerId,
         badgeId: lastHitBadge.id,
-        bossSessionId: bossSessionId,
+        eventBossId: eventBossId,
+        eventId: eventId || 1,
       });
 
       console.log(
-        `🎯 Last Hit badge awarded to player ${playerId} for boss session ${bossSessionId}`
+        `🎯 Last Hit badge awarded to player ${playerId} for event boss ${eventBossId}`
       );
-      return userBadge;
+      console.log(
+        `🎯 [FRONTEND] Last Hit Badge: ${lastHitBadge.name}, Player: ${playerId}`
+      );
+
+      return {
+        userBadge,
+        badgeInfo: lastHitBadge,
+      };
     } catch (error) {
       console.error("Error awarding Last Hit badge:", error);
       throw error;
     }
   }
 
-  // Award Boss Defeated badge to all winning team members
-  static async awardBossDefeatedBadges(winningTeamPlayerIds, bossSessionId) {
+  // Award Boss Defeated badge to all winning team members - Updated for simplified schema
+  static async awardBossDefeatedBadges(
+    winningTeamPlayerIds,
+    eventBossId,
+    eventId = null
+  ) {
     try {
       const bossDefeatedBadge = await Badge.findOne({
         where: { name: "Boss Defeated" },
@@ -111,12 +137,12 @@ class BadgeService {
       const awardedBadges = [];
 
       for (const playerId of winningTeamPlayerIds) {
-        // Check if player already has this badge for this boss session
+        // Check if player already has this badge for this event boss
         const existingBadge = await UserBadge.findOne({
           where: {
             playerId,
             badgeId: bossDefeatedBadge.id,
-            bossSessionId: bossSessionId,
+            eventBossId: eventBossId,
           },
         });
 
@@ -124,15 +150,27 @@ class BadgeService {
           const userBadge = await UserBadge.create({
             playerId,
             badgeId: bossDefeatedBadge.id,
-            bossSessionId: bossSessionId,
+            eventBossId: eventBossId,
+            eventId: eventId || 1,
           });
-          awardedBadges.push(userBadge);
+          awardedBadges.push({
+            userBadge,
+            badgeInfo: bossDefeatedBadge,
+            playerId,
+          });
         }
       }
 
       console.log(
-        `🏅 Boss Defeated badges awarded to ${awardedBadges.length} players for boss session ${bossSessionId}`
+        `🏅 Boss Defeated badges awarded to ${awardedBadges.length} players for event boss ${eventBossId}`
       );
+
+      awardedBadges.forEach((badge) => {
+        console.log(
+          `🏅 [FRONTEND] Boss Defeated Badge: ${badge.badgeInfo.name}, Player: ${badge.playerId}`
+        );
+      });
+
       return awardedBadges;
     } catch (error) {
       console.error("Error awarding Boss Defeated badges:", error);
@@ -140,7 +178,88 @@ class BadgeService {
     }
   }
 
-  // Award question milestone badges (10, 25, 50, 100 correct answers per event)
+  // Real-time milestone badge checking during the fight
+  static async checkMilestoneProgress(
+    playerId,
+    eventId,
+    currentCorrectAnswers,
+    socketCallback = null
+  ) {
+    try {
+      console.log(
+        `🎖️ [MILESTONE CHECK] Player ${playerId}, Event ${eventId}, Current Correct: ${currentCorrectAnswers}`
+      );
+
+      const milestones = [10, 25, 50, 100];
+      const awardedBadges = [];
+
+      for (const milestone of milestones) {
+        if (currentCorrectAnswers === milestone) {
+          // Check if player already has this milestone badge for this event
+          const milestoneBadge = await Badge.findOne({
+            where: { name: `${milestone} Questions` },
+          });
+
+          if (!milestoneBadge) {
+            console.warn(`${milestone} Questions badge not found in database`);
+            continue;
+          }
+
+          const existingBadge = await UserBadge.findOne({
+            where: {
+              playerId,
+              badgeId: milestoneBadge.id,
+              eventId: eventId,
+            },
+          });
+
+          if (!existingBadge) {
+            // Award the milestone badge
+            const userBadge = await UserBadge.create({
+              playerId,
+              badgeId: milestoneBadge.id,
+              eventBossId: null, // Event-wide milestone, not boss-specific
+              eventId: eventId,
+            });
+
+            const badgeNotification = {
+              type: "milestone_badge",
+              badge: {
+                id: userBadge.id,
+                name: milestoneBadge.name,
+                image: milestoneBadge.image,
+                milestone: milestone,
+              },
+              playerId: playerId,
+              message: `🎖️ Milestone achieved! ${milestone} correct answers!`,
+              timestamp: new Date(),
+            };
+
+            awardedBadges.push(badgeNotification);
+
+            console.log(
+              `🎖️ [MILESTONE BADGE] ${milestoneBadge.name} awarded to player ${playerId} for reaching ${milestone} correct answers in event ${eventId}`
+            );
+            console.log(
+              `🎖️ [FRONTEND NOTIFICATION] Badge: ${milestoneBadge.name}, Player: ${playerId}, Milestone: ${milestone}`
+            );
+
+            // Send real-time notification if callback provided
+            if (socketCallback) {
+              socketCallback(badgeNotification);
+            }
+          }
+        }
+      }
+
+      return awardedBadges;
+    } catch (error) {
+      console.error("Error checking milestone progress:", error);
+      throw error;
+    }
+  }
+
+  // Award question milestone badges (10, 25, 50, 100 correct answers per event) - Updated for simplified schema
   static async awardMilestoneBadge(playerId, eventId, correctAnswerCount) {
     try {
       const milestones = [
@@ -163,12 +282,11 @@ class BadgeService {
           }
 
           // Check if player already has this milestone badge for this event
-          // For milestones, we use eventId instead of bossSessionId
           const existingBadge = await UserBadge.findOne({
             where: {
               playerId,
               badgeId: milestoneBadge.id,
-              bossSessionId: eventId, // Using eventId for milestones
+              eventId: eventId,
             },
           });
 
@@ -176,7 +294,8 @@ class BadgeService {
             const userBadge = await UserBadge.create({
               playerId,
               badgeId: milestoneBadge.id,
-              bossSessionId: eventId,
+              eventBossId: null, // Event-wide milestone
+              eventId: eventId,
             });
             awardedBadges.push({
               badge: userBadge,
@@ -198,21 +317,22 @@ class BadgeService {
     }
   }
 
-  // Get player's badges for a specific event
+  // Get player's badges for a specific event - Updated for simplified schema
   static async getPlayerBadgesForEvent(playerId, eventId) {
     try {
       return await UserBadge.findAll({
         where: {
           playerId,
-          bossSessionId: eventId,
+          eventId: eventId,
         },
         include: [
           {
             model: Badge,
+            as: "badge",
             attributes: ["id", "name", "image"],
           },
         ],
-        order: [["earned_at", "DESC"]],
+        order: [["createdAt", "DESC"]],
       });
     } catch (error) {
       console.error("Error getting player badges:", error);
@@ -220,19 +340,16 @@ class BadgeService {
     }
   }
 
-  // Get player's total correct answers across all bosses in an event
+  // Get player's event-wide stats for milestone tracking
   static async getPlayerEventStats(playerId, eventId, bossSessionManager) {
     try {
-      // This would need to be implemented based on how you track event-wide stats
-      // For now, we'll return a placeholder that can be updated with actual logic
       let totalCorrectAnswers = 0;
 
-      // Get all boss sessions for this event
+      // Get all sessions for this event from the boss session manager
       const allSessions = bossSessionManager.getAllSessions();
 
-      for (const session of allSessions) {
+      for (const [eventBossId, session] of allSessions) {
         if (session.eventId === eventId) {
-          // Assuming you add eventId to sessions
           const player = session.players.get(playerId);
           if (player) {
             totalCorrectAnswers += player.correctAnswers || 0;
@@ -240,13 +357,47 @@ class BadgeService {
         }
       }
 
+      console.log(
+        `📊 [EVENT STATS] Player ${playerId} in Event ${eventId}: ${totalCorrectAnswers} total correct answers`
+      );
+
       return {
         totalCorrectAnswers,
         eventId,
+        playerId,
       };
     } catch (error) {
       console.error("Error getting player event stats:", error);
       throw error;
+    }
+  }
+
+  // Calculate player's total correct answers across the entire event
+  static async calculateEventWideCorrectAnswers(
+    playerId,
+    eventId,
+    bossSessionManager
+  ) {
+    try {
+      let eventTotal = 0;
+      const allSessions = bossSessionManager.getAllSessions();
+
+      for (const [eventBossId, session] of allSessions) {
+        if (session.eventId === eventId) {
+          const player = session.players.get(playerId);
+          if (player) {
+            eventTotal += player.correctAnswers || 0;
+          }
+        }
+      }
+
+      console.log(
+        `🧮 [CALCULATION] Player ${playerId} has ${eventTotal} total correct answers across event ${eventId}`
+      );
+      return eventTotal;
+    } catch (error) {
+      console.error("Error calculating event-wide correct answers:", error);
+      return 0;
     }
   }
 

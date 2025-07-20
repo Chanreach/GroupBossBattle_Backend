@@ -9,27 +9,19 @@ const PlayerSession = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    bossSessionId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-    },
     userId: {
       type: DataTypes.UUID,
       allowNull: true,
+      field: "user_id",
     },
-    nickname: {
+    username: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    damageDealt: {
-      type: DataTypes.INTEGER,
+    eventId: {
+      type: DataTypes.UUID,
       allowNull: false,
-      defaultValue: 0,
-    },
-    correctAnswers: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 0,
+      field: "event_id",
     },
   },
   {
@@ -38,10 +30,10 @@ const PlayerSession = sequelize.define(
     underscored: true,
     indexes: [
       {
-        fields: ["boss_session_id"],
+        fields: ["user_id"],
       },
       {
-        fields: ["user_id"],
+        fields: ["event_id"],
       },
     ],
   }

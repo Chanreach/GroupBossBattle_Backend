@@ -9,17 +9,10 @@ const Leaderboard = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    userId: {
+    playerId: {
       type: DataTypes.UUID,
       allowNull: false,
-    },
-    eventId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-    },
-    eventBossId: {
-      type: DataTypes.UUID,
-      allowNull: true,
+      field: "player_id",
     },
     totalDamageDealt: {
       type: DataTypes.INTEGER,
@@ -31,11 +24,11 @@ const Leaderboard = sequelize.define(
       allowNull: false,
       defaultValue: 0,
     },
-    sessionsPlayed: {
-      type: DataTypes.INTEGER,
+    eventBossId: {
+      type: DataTypes.UUID,
       allowNull: false,
-      defaultValue: 0,
-    }
+      field: "event_boss_id",
+    },
   },
   {
     tableName: "leaderboards",
@@ -43,13 +36,16 @@ const Leaderboard = sequelize.define(
     underscored: true,
     indexes: [
       {
-        fields: ["user_id"],
-      },
-      {
-        fields: ["event_id"],
+        fields: ["player_id"],
       },
       {
         fields: ["event_boss_id"],
+      },
+      {
+        fields: ["total_damage_dealt"],
+      },
+      {
+        fields: ["total_correct_answers"],
       },
     ],
   }

@@ -64,6 +64,11 @@ const handleMatchmaking = (io, socket) => {
     try {
       const { eventBossId, joinCode, playerData } = data;
 
+      console.log(
+        `🔍 [DEBUG] boss-fight:join received playerData:`,
+        playerData
+      );
+
       if (!eventBossId || !joinCode || !playerData) {
         socket.emit("error", { message: "Missing required data" });
         return;
@@ -128,8 +133,13 @@ const handleMatchmaking = (io, socket) => {
         name: boss.boss.name,
         cooldownDuration: boss.cooldownDuration,
         numberOfTeams: boss.numberOfTeams,
+        eventId: boss.eventId, // Add the missing eventId!
         questionsData: questionsData,
       };
+
+      console.log(
+        `🔍 [DEBUG] Creating boss session with eventId: ${boss.eventId}`
+      );
 
       // Create or get session
       const session = bossSessionManager.createSession(eventBossId, bossData);

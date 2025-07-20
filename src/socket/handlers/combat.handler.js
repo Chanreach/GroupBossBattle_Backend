@@ -17,8 +17,10 @@ const handleCombat = (io, socket) => {
           maxHp: 10,
           currentHp: 10, // Set initial HP to full
           numberOfTeams: 2,
+          eventId: "test-event-" + eventBossId, // Add eventId for milestone tracking
           // Add other boss data as needed
         });
+        console.log(`🔧 Test session created with eventId: ${session.eventId}`);
       }
 
       // Start the session if it's not started
@@ -293,7 +295,7 @@ const handleCombat = (io, socket) => {
 
       if (isCorrect) {
         // **Use enhanced processAttack with response time-based damage**
-        const result = bossSessionManager.processAttack(
+        const result = await bossSessionManager.processAttack(
           eventBossId,
           playerSession.playerId,
           isCorrect,
@@ -329,6 +331,48 @@ const handleCombat = (io, socket) => {
             "💥 ========================================================="
           );
 
+          // **NEW: Check for real-time milestone badges after correct answer**
+          try {
+            console.log(
+              `🎖️ [MILESTONE CHECK] Player ${player.nickname} has ${result.player.correctAnswers} correct answers`
+            );
+
+            const newMilestoneBadges =
+              await bossSessionManager.checkAndAwardMilestoneBadges(
+                eventBossId,
+                playerSession.playerId,
+                result.player.correctAnswers
+              );
+
+            console.log(
+              `🎖️ [MILESTONE RESULT] Found ${newMilestoneBadges.length} new milestone badges for ${player.nickname}`
+            );
+
+            if (newMilestoneBadges.length > 0) {
+              // Store the badges in session for real-time notification
+              if (!session.realtimeBadges) {
+                session.realtimeBadges = [];
+              }
+              session.realtimeBadges.push(...newMilestoneBadges);
+
+              console.log(
+                `🎖️ ${newMilestoneBadges.length} milestone badge(s) ready for notification to ${player.nickname}`
+              );
+
+              // Debug what badges were found
+              newMilestoneBadges.forEach((badge) => {
+                console.log(
+                  `🎖️ [MILESTONE BADGE] ${badge.badgeName} (milestone: ${badge.milestone}) for ${badge.playerNickname}`
+                );
+              });
+            }
+          } catch (error) {
+            console.error(
+              "❌ [MILESTONE ERROR] Error checking milestone badges:",
+              error
+            );
+          }
+
           // Send response to player with enhanced data
           socket.emit("answer-result", {
             isCorrect: true,
@@ -344,6 +388,37 @@ const handleCombat = (io, socket) => {
             },
             message: `Correct! You dealt ${result.damage} damage! (${result.responseCategory} response)`,
           });
+
+          // **NEW: Check for real-time milestone badges after correct answer**
+          if (session.realtimeBadges && session.realtimeBadges.length > 0) {
+            // Send milestone badge notifications to the player who earned them
+            const playerMilestoneBadges = session.realtimeBadges.filter(
+              (badge) => badge.playerId === player.userId
+            );
+
+            if (playerMilestoneBadges.length > 0) {
+              playerMilestoneBadges.forEach((badge) => {
+                socket.emit("badge-earned", {
+                  type: "Milestone",
+                  badgeId: badge.badgeId,
+                  badgeName: badge.badgeName,
+                  message: `🎖️ Milestone achieved! You earned the "${badge.badgeName}" badge!`,
+                  milestone: badge.milestone,
+                  eventBossId: badge.eventBossId,
+                  isRealTime: true,
+                });
+
+                console.log(
+                  `🎖️ Sent real-time milestone badge notification: ${badge.badgeName} to ${badge.playerNickname}`
+                );
+              });
+            }
+
+            // Clear the real-time badges for this player to prevent duplicate notifications
+            session.realtimeBadges = session.realtimeBadges.filter(
+              (badge) => badge.playerId !== player.userId
+            );
+          }
 
           // Broadcast attack to all players in session with enhanced data
           io.to(`boss-${eventBossId}`).emit("player-attacked", {
@@ -631,6 +706,24 @@ function handlePlayerDeath(io, eventBossId, playerId) {
 
 async function handleBossDefeated(io, eventBossId, result) {
   try {
+    // **GENERATE LEADERBOARDS BEFORE ENDING FIGHT** - This preserves team damage stats
+    console.log(
+      `🏆 Generating final leaderboards before ending boss fight ${eventBossId}`
+    );
+    const finalLeaderboards =
+      bossSessionManager.generateLiveLeaderboard(eventBossId);
+
+    // Log team damage for debugging
+    if (finalLeaderboards && finalLeaderboards.teamLeaderboard) {
+      console.log(
+        "🏆 Team damage captured:",
+        finalLeaderboards.teamLeaderboard.map((team) => ({
+          teamName: team.teamName,
+          totalDamage: team.totalDamage,
+        }))
+      );
+    }
+
     const endResult = await bossSessionManager.endBossFight(
       eventBossId,
       result.finalHitBy
@@ -680,17 +773,19 @@ async function handleBossDefeated(io, eventBossId, result) {
           : null,
       });
 
-      // **NEW: Generate and broadcast final leaderboards**
-      const finalLeaderboards = bossSessionManager.generateLiveLeaderboard(eventBossId);
+      // **BROADCAST PRE-GENERATED FINAL LEADERBOARDS** - Using data from before endBossFight
       if (finalLeaderboards) {
         io.to(`boss-${eventBossId}`).emit("final-leaderboards", {
           ...finalLeaderboards,
           eventBossId,
+          bossName: session.bossData.name || "Boss",
           completedAt: new Date().toISOString(),
           totalParticipants: session.players.size,
           battleDuration: Math.floor((new Date() - session.startedAt) / 1000), // Duration in seconds
         });
-        console.log(`🏆 Final leaderboards broadcasted for session ${eventBossId}`);
+        console.log(
+          `🏆 Final leaderboards broadcasted for session ${eventBossId}`
+        );
       }
 
       // Broadcast boss status update to cooldown
@@ -718,6 +813,7 @@ async function handleBossDefeated(io, eventBossId, result) {
             mvpSocket.emit("badge-earned", {
               type: "MVP",
               badgeId: awardedBadges.mvp.badgeId,
+              badgeName: "MVP", // Explicit badge name
               message: `🏆 Congratulations! You earned the MVP badge with ${mvpPlayer.totalDamage} damage!`,
               eventBossId,
             });
@@ -735,6 +831,7 @@ async function handleBossDefeated(io, eventBossId, result) {
               lastHitSocket.emit("badge-earned", {
                 type: "Last Hit",
                 badgeId: awardedBadges.lastHit.badgeId,
+                badgeName: "Last Hit", // Explicit badge name
                 message: "🎯 Congratulations! You earned the Last Hit badge!",
                 eventBossId,
               });
@@ -752,6 +849,7 @@ async function handleBossDefeated(io, eventBossId, result) {
                 playerSocket.emit("badge-earned", {
                   type: "Boss Defeated",
                   badgeId: awardedBadges.bossDefeated[0]?.badgeId, // Same badge for all
+                  badgeName: "Boss Defeated", // Explicit badge name
                   message:
                     "🏅 Congratulations! You earned the Boss Defeated badge!",
                   eventBossId,
@@ -771,9 +869,11 @@ async function handleBossDefeated(io, eventBossId, result) {
                 playerSocket.emit("badge-earned", {
                   type: "Milestone",
                   badgeId: badgeInfo.badge.badgeId,
+                  badgeName: badgeInfo.badgeInfo.name, // Include the badge name
                   message: `🎖️ Congratulations! You earned the ${badgeInfo.badgeInfo.name} milestone badge!`,
                   milestone: badgeInfo.milestone,
                   eventBossId,
+                  isBattleEnd: true, // Flag to indicate this is a battle-end notification
                 });
               });
             }

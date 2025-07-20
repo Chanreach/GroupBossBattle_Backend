@@ -9,11 +9,17 @@ const router = express.Router();
  */
 router.get("/all-time", async (req, res) => {
   try {
-    const { limit = 50, bossId } = req.query;
-    
+    const { limit = 50, bossId, eventBossId } = req.query;
+
     let leaderboard;
-    if (bossId && bossId !== 'default') {
-      // Get all-time leaderboard for a specific boss
+    if (eventBossId && eventBossId !== "default") {
+      // Get all-time leaderboard for a specific event boss
+      leaderboard = await LeaderboardService.getEventBossAllTimeLeaderboard(
+        eventBossId,
+        parseInt(limit)
+      );
+    } else if (bossId && bossId !== "default") {
+      // Get all-time leaderboard for a specific boss (across all events)
       leaderboard = await LeaderboardService.getBossAllTimeLeaderboard(
         bossId,
         parseInt(limit)
@@ -29,7 +35,8 @@ router.get("/all-time", async (req, res) => {
       success: true,
       leaderboard: leaderboard, // Changed from data to leaderboard to match frontend
       total: leaderboard.length,
-      bossId: bossId || 'all',
+      bossId: bossId || "all",
+      eventBossId: eventBossId || null,
     });
   } catch (error) {
     console.error("Error fetching all-time leaderboard:", error);
@@ -43,21 +50,21 @@ router.get("/all-time", async (req, res) => {
 
 /**
  * GET /api/leaderboards/event/:eventId
- * Get leaderboard for a specific event
+ * Get event overall leaderboard (across all bosses in event)
  */
 router.get("/event/:eventId", async (req, res) => {
   try {
     const { eventId } = req.params;
     const { limit = 50 } = req.query;
 
-    const leaderboard = await LeaderboardService.getEventLeaderboard(
+    const leaderboard = await LeaderboardService.getEventOverallLeaderboard(
       eventId,
       parseInt(limit)
     );
 
     res.json({
       success: true,
-      data: leaderboard,
+      leaderboard: leaderboard,
       total: leaderboard.length,
       eventId,
     });
@@ -72,61 +79,57 @@ router.get("/event/:eventId", async (req, res) => {
 });
 
 /**
- * GET /api/leaderboards/user/:userId
- * Get stats for a specific user
+ * GET /api/leaderboards/boss/:eventId/:eventBossId
+ * Get boss-specific leaderboard
  */
-router.get("/user/:userId", async (req, res) => {
+router.get("/boss/:eventId/:eventBossId", async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { eventId, eventBossId } = req.params;
+    const { limit = 50 } = req.query;
 
-    const userStats = await LeaderboardService.getUserStats(userId);
+    const leaderboard = await LeaderboardService.getBossSpecificLeaderboard(
+      eventId,
+      eventBossId,
+      parseInt(limit)
+    );
 
     res.json({
       success: true,
-      data: userStats,
-      userId,
+      leaderboard: leaderboard,
+      total: leaderboard.length,
+      eventId,
+      eventBossId,
     });
   } catch (error) {
-    console.error("Error fetching user stats:", error);
+    console.error("Error fetching boss-specific leaderboard:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch user stats",
+      message: "Failed to fetch boss-specific leaderboard",
       error: error.message,
     });
   }
 });
 
 /**
- * POST /api/leaderboards/update-battle
- * Update leaderboards after battle completion (internal use)
+ * GET /api/leaderboards/player/:playerId
+ * Get stats for a specific player
  */
-router.post("/update-battle", async (req, res) => {
+router.get("/player/:playerId", async (req, res) => {
   try {
-    const { eventId, eventBossId, playersData } = req.body;
+    const { playerId } = req.params;
 
-    if (!eventId || !playersData || !Array.isArray(playersData)) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields: eventId, playersData",
-      });
-    }
-
-    const results = await LeaderboardService.updateBattleLeaderboards(
-      eventId,
-      eventBossId,
-      playersData
-    );
+    const playerStats = await LeaderboardService.getPlayerStats(playerId);
 
     res.json({
       success: true,
-      message: "Leaderboards updated successfully",
-      updatedCount: results.length,
+      data: playerStats,
+      playerId,
     });
   } catch (error) {
-    console.error("Error updating battle leaderboards:", error);
+    console.error("Error fetching player stats:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to update leaderboards",
+      message: "Failed to fetch player stats",
       error: error.message,
     });
   }

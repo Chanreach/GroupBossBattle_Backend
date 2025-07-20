@@ -9,12 +9,12 @@ import RandomGenerator from "../../utils/random-generator.js";
 import TeamNameGenerator from "../../utils/team-name-generator.js";
 import BadgeService from "../../services/badge.service.js";
 import LeaderboardService from "../../services/leaderboard.service.js";
-import { BossSession, EventBoss } from "../../models/index.js";
+import { EventBoss, PlayerSession } from "../../models/index.js";
 import {
   generateUniqueRevivalCode,
   validateRevivalCode,
   formatRevivalCodeForDisplay,
-} from "../../utils/generateRevivalCode.js"; // **NEW: Import revival code utilities**
+} from "../../utils/generateRevivalCode.js";
 
 function createPlayerSeed(playerId, sessionId, contexts = []) {
   const contextString = contexts.join("_");
@@ -37,7 +37,6 @@ class BossSessionManager {
       const session = {
         eventBossId,
         eventId: bossData.eventId, // Add eventId for tracking event-wide progress
-        bossSessionId: null, // Will be set when battle starts and DB record is created
         bossData: {
           ...bossData,
           baseHp: initialHp,
@@ -117,11 +116,22 @@ class BossSessionManager {
     if (!session) return null;
 
     const playerId = playerData.playerId || uuidv4();
+
+    // Ensure guest users have null userId
+    let userId = null;
+    if (playerData.id && !playerData.isGuest) {
+      userId = playerData.id;
+    }
+
+    console.log(
+      `🔍 [DEBUG] Adding player: ${playerData.nickname}, isGuest: ${playerData.isGuest}, original ID: ${playerData.id}, final userId: ${userId}`
+    );
+
     const player = {
       id: playerId,
       socketId,
       nickname: playerData.nickname,
-      userId: playerData.id || null,
+      userId: userId, // Explicitly set to null for guests
       username: playerData.username || playerData.nickname,
       isGuest: playerData.isGuest || false,
       hearts: 3,
@@ -134,22 +144,6 @@ class BossSessionManager {
       correctAnswers: 0,
     };
 
-    // ===== PLAYER CREATION DEBUG =====
-    console.log("👤 =============== PLAYER CREATION DEBUG ===============");
-    console.log("🆔 Session Info:");
-    console.log(`   Event Boss ID: ${eventBossId}`);
-    console.log(`   Session Started: ${session.isStarted}`);
-    console.log(`   Current Players: ${session.players.size}`);
-    console.log("👤 New Player Created:");
-    console.log(`   Player ID: ${playerId}`);
-    console.log(`   Socket ID: ${socketId}`);
-    console.log(`   Nickname: ${player.nickname}`);
-    console.log(`   Initial Hearts: ${player.hearts}`);
-    console.log(`   Status: ${player.status}`);
-    console.log(`   Is Knocked Out: ${player.isKnockedOut}`);
-    console.log(`   Team ID: ${player.teamId || "Not assigned yet"}`);
-    console.log("👤 ====================================================");
-
     session.players.set(playerId, player);
     session.waitingPlayers.add(playerId);
 
@@ -158,32 +152,18 @@ class BossSessionManager {
       playerId,
       eventBossId,
       nickname: playerData.nickname,
-      userId: playerData.id || null,
+      userId: userId, // Use the same cleaned userId
       username: playerData.username || playerData.nickname,
       isGuest: playerData.isGuest || false,
     });
 
     // **AUTO-ASSIGN TO TEAM if battle has already started (mid-game join)**
     if (session.isStarted) {
-      console.log(
-        `🔄 [MID-GAME JOIN] Processing mid-game join for ${player.nickname}`
-      );
       this.assignPlayerToTeam(session, playerId);
       // Also move player to active players
       session.waitingPlayers.delete(playerId);
       session.activePlayers.add(playerId);
       player.status = "active";
-
-      console.log(
-        `👤 [MID-GAME JOIN] Player ${player.nickname} status updated:`,
-        {
-          teamId: player.teamId,
-          status: player.status,
-          hearts: player.hearts,
-          isActive: session.activePlayers.has(playerId),
-          isWaiting: session.waitingPlayers.has(playerId),
-        }
-      );
 
       // **UPDATE BOSS HP for mid-game join**
       const hpUpdateResult = this.updateBossHP(
@@ -193,7 +173,7 @@ class BossSessionManager {
       );
       if (hpUpdateResult.changed) {
         console.log(
-          `🔄 [MID-GAME JOIN] Boss HP updated for player ${player.nickname}`
+          `[MID-GAME JOIN] Boss HP updated for player ${player.nickname}`
         );
       }
     }
@@ -218,7 +198,7 @@ class BossSessionManager {
       const questionsData = session.bossData.questionsData || [];
 
       if (questionsData.length === 0) {
-        console.warn(`⚠️  No questions data found for boss ${eventBossId}`);
+        console.warn(`No questions data found for boss ${eventBossId}`);
         return null;
       }
 
@@ -289,22 +269,6 @@ class BossSessionManager {
 
       const player = session.players.get(playerId);
       const playerNickname = player?.nickname || `Player ${playerId}`;
-
-      console.log(
-        `📝 [QUESTION POOL] Assigned ${questionsWithPreparedChoices.length} questions to ${playerNickname} (${playerId})`
-      );
-      console.log(
-        `🎲 [QUESTION POOL] Sample questions for ${playerNickname}:`,
-        questionsWithPreparedChoices
-          .slice(0, 3)
-          .map(
-            (q, index) =>
-              `${index + 1}. [${q.categoryName}] "${q.text}" [Choices: ${
-                q.choices.length
-              }] [Correct Index: ${q.correctAnswerIndex}]`
-          )
-          .join("\n   ")
-      );
 
       return {
         questionsAssigned: questionsWithPreparedChoices.length,
@@ -683,27 +647,14 @@ class BossSessionManager {
     const numberOfTeams = session.numberOfTeams;
 
     try {
-      // **1. CREATE BOSS SESSION DATABASE RECORD**
-      const bossSessionRecord = await BossSession.create({
-        eventBossId: eventBossId,
-        startTime: new Date(),
-        totalParticipants: playerCount,
-        finalDamageDealt: 0,
-      });
-
-      // Store the database session ID in our memory session
-      session.bossSessionId = bossSessionRecord.id;
-
-      console.log(`🎲 [BOSS SESSION] Created database record:`, {
-        sessionId: session.bossSessionId,
-        eventBossId: eventBossId,
-        participants: playerCount,
-      });
-
       // **UPDATE BOSS STATUS TO IN-BATTLE**
       await EventBoss.update(
         { status: "in-battle" },
         { where: { id: eventBossId } }
+      );
+
+      console.log(
+        `🎲 [BOSS BATTLE] Starting battle for eventBossId: ${eventBossId}, participants: ${playerCount}`
       );
 
       // **2. SCALE BOSS HP based on player count and team count**
@@ -759,7 +710,7 @@ class BossSessionManager {
 
       return {
         success: true,
-        bossSessionId: session.bossSessionId,
+        eventBossId: eventBossId,
         questionPoolAssignments,
         bossHp: {
           baseHp: session.bossData.baseHp,
@@ -1041,7 +992,7 @@ class BossSessionManager {
   }
 
   // **ENHANCED: Process attack with response time-based damage calculation (from combat system)**
-  processAttack(
+  async processAttack(
     eventBossId,
     playerId,
     isCorrect,
@@ -1071,6 +1022,21 @@ class BossSessionManager {
     player.questionsAnswered++;
     if (isCorrect) {
       player.correctAnswers++;
+
+      // **NEW: Check for milestone badges in real-time**
+      const newMilestoneBadges = await this.checkAndAwardMilestoneBadges(
+        eventBossId,
+        playerId,
+        player.correctAnswers
+      );
+
+      // Store milestone badges for immediate notification
+      if (newMilestoneBadges.length > 0) {
+        if (!session.realtimeBadges) {
+          session.realtimeBadges = [];
+        }
+        session.realtimeBadges.push(...newMilestoneBadges);
+      }
     }
 
     // Update team damage
@@ -1372,8 +1338,15 @@ class BossSessionManager {
 
   // End boss fight
   async endBossFight(eventBossId, finalHitPlayerId = null) {
+    console.log(
+      `🏁 [END BOSS] Starting endBossFight for ${eventBossId}, finalHit: ${finalHitPlayerId}`
+    );
+
     const session = this.sessions.get(eventBossId);
-    if (!session) return null;
+    if (!session) {
+      console.log(`🏁 [END BOSS] No session found for ${eventBossId}`);
+      return null;
+    }
 
     // Set the end time for session tracking
     session.endTime = new Date();
@@ -1411,6 +1384,11 @@ class BossSessionManager {
 
     // **AWARD BADGES**
     try {
+      const sessionToken = Math.random().toString(36).substring(2, 8);
+      console.log(
+        `🎖️ [BADGE START] Badge awarding session ${sessionToken} for ${eventBossId}`
+      );
+
       const awardedBadges = {
         mvp: null,
         lastHit: null,
@@ -1418,23 +1396,18 @@ class BossSessionManager {
         milestones: [],
       };
 
-      // Use the correct boss session ID for badge references
-      const bossSessionId = session.bossSessionId;
-      if (!bossSessionId) {
-        console.error("No boss session ID found - cannot award badges");
-        throw new Error("Missing boss session ID");
-      }
-
-      // Award MVP badge
+      // Award MVP badge (pass eventBossId instead of bossSessionId)
       if (mvpPlayer && mvpPlayer.userId) {
         console.log(
           `🏆 Awarding MVP badge to ${mvpPlayer.nickname} with ${mvpDamage} damage`
         );
         awardedBadges.mvp = await BadgeService.awardMVPBadge(
           mvpPlayer.userId,
-          bossSessionId,
-          mvpDamage
+          eventBossId, // Use eventBossId instead of bossSessionId
+          mvpDamage,
+          session.eventId // Pass actual eventId
         );
+        console.log(`🏆 [DEBUG] MVP Badge Service Result:`, awardedBadges.mvp);
       }
 
       // Award Last Hit badge
@@ -1446,7 +1419,12 @@ class BossSessionManager {
           );
           awardedBadges.lastHit = await BadgeService.awardLastHitBadge(
             finalHitPlayer.userId,
-            bossSessionId
+            eventBossId, // Use eventBossId instead of bossSessionId
+            session.eventId // Pass actual eventId
+          );
+          console.log(
+            `🎯 [DEBUG] Last Hit Badge Service Result:`,
+            awardedBadges.lastHit
           );
         }
       }
@@ -1466,7 +1444,12 @@ class BossSessionManager {
         );
         awardedBadges.bossDefeated = await BadgeService.awardBossDefeatedBadges(
           winningPlayerIds,
-          bossSessionId
+          eventBossId, // Use eventBossId instead of bossSessionId
+          session.eventId // Pass actual eventId
+        );
+        console.log(
+          `🏅 [DEBUG] Boss Defeated Badge Service Result:`,
+          awardedBadges.bossDefeated
         );
       }
 
@@ -1506,40 +1489,144 @@ class BossSessionManager {
         milestones: awardedBadges.milestones.length,
       });
 
-      // **UPDATE LEADERBOARD DATA**
+      // **INSERT PLAYER SESSION RECORDS WITH SIMPLIFIED SCHEMA**
       try {
-        console.log("📊 Updating leaderboard data for boss defeat...");
+        console.log("💾 Inserting player session records...");
 
-        // Collect player performance data for leaderboard updates
-        const leaderboardUpdates = [];
+        const playerSessionInserts = [];
         for (const [playerId, player] of session.players) {
-          if (player.userId) {
-            leaderboardUpdates.push({
-              userId: player.userId,
-              eventId: session.eventId,
-              eventBossId: eventBossId,
-              totalDamage: player.totalDamage || 0,
-              questionsAnswered: player.questionsAnswered || 0,
-              correctAnswers: player.correctAnswers || 0,
-              sessionDuration: session.endTime
-                ? Math.floor((session.endTime - session.startTime) / 1000)
-                : 0,
-              isWinner: winningTeam && winningTeam.players.has(playerId),
-              rank: this.calculatePlayerRank(session, playerId),
-            });
+          // Include ALL players (authenticated and guests) with simplified schema
+          console.log(
+            `🔍 [DEBUG] Preparing player session for: ${player.nickname}, userId: ${player.userId}, isGuest: ${player.isGuest}`
+          );
+          playerSessionInserts.push({
+            id: uuidv4(),
+            userId: player.userId, // Null for guests, actual ID for authenticated users
+            username: player.username || player.nickname,
+            eventId: session.eventId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+
+        // Bulk insert player session records
+        if (playerSessionInserts.length > 0) {
+          console.log(
+            `🔍 [DEBUG] About to insert ${playerSessionInserts.length} player sessions:`,
+            playerSessionInserts.map((p) => ({
+              username: p.username,
+              userId: p.userId || "GUEST",
+            }))
+          );
+          const createdSessions = await PlayerSession.bulkCreate(
+            playerSessionInserts,
+            {
+              returning: true, // Get the created records back
+            }
+          );
+          console.log(
+            `✅ Inserted ${createdSessions.length} player session records (including guests)`
+          );
+
+          // Store the session records for leaderboard updates
+          session.createdPlayerSessions = createdSessions;
+        } else {
+          console.log("👻 No players to insert (this shouldn't happen)");
+        }
+      } catch (playerSessionError) {
+        console.error(
+          "❌ Error inserting player session records:",
+          playerSessionError.message
+        );
+        console.error("❌ Full error details:", playerSessionError);
+        if (
+          playerSessionError.original &&
+          playerSessionError.original.code === "ER_NO_REFERENCED_ROW_2"
+        ) {
+          console.error(
+            "❌ Foreign key constraint violation - check user IDs in player session data"
+          );
+        }
+      }
+
+      // **UPDATE LEADERBOARD DATA USING BATTLE RESULTS**
+      try {
+        console.log("📊 Updating leaderboard data using battle results...");
+
+        console.log(
+          `🔍 Processing ${session.players.size} players for leaderboard updates`
+        );
+
+        const leaderboardPromises = [];
+        for (const [playerId, player] of session.players) {
+          try {
+            // Only proceed if we have eventId
+            if (session.eventId) {
+              // For authenticated users, use their userId as playerId in leaderboard
+              // For guests, use the player session ID from created records
+              let leaderboardPlayerId = player.userId;
+
+              // If guest user, find their session record ID
+              if (!player.userId && session.createdPlayerSessions) {
+                const sessionRecord = session.createdPlayerSessions.find(
+                  (s) => s.username === (player.username || player.nickname)
+                );
+                if (sessionRecord) {
+                  leaderboardPlayerId = sessionRecord.id;
+                }
+              }
+
+              if (leaderboardPlayerId) {
+                const leaderboardPromise =
+                  LeaderboardService.updatePlayerLeaderboard(
+                    leaderboardPlayerId, // User ID for auth users, session ID for guests
+                    eventBossId, // Use eventBossId directly for simplified schema
+                    player.totalDamage || 0,
+                    player.correctAnswers || 0
+                  );
+                leaderboardPromises.push(leaderboardPromise);
+
+                const playerType = player.userId ? "authenticated" : "guest";
+                console.log(
+                  `📈 Queueing leaderboard update for: ${player.nickname} (${playerType}, ID: ${leaderboardPlayerId})`
+                );
+              } else {
+                console.warn(
+                  `⚠️ Could not determine leaderboard player ID for ${player.nickname}`
+                );
+              }
+            } else {
+              console.warn(
+                `⚠️ Skipping leaderboard update for player ${player.nickname} - no eventId available`
+              );
+            }
+          } catch (error) {
+            console.error(
+              `❌ Error preparing leaderboard update for player ${player.nickname}:`,
+              error
+            );
           }
         }
 
-        // Update leaderboard data in database
-        if (leaderboardUpdates.length > 0) {
-          await LeaderboardService.updateBattleLeaderboards(
-            session.eventId,
-            eventBossId, 
-            leaderboardUpdates
-          );
-          console.log(
-            `📈 Updated leaderboard data for ${leaderboardUpdates.length} players`
-          );
+        // Execute all leaderboard updates
+        if (leaderboardPromises.length > 0) {
+          try {
+            await Promise.all(leaderboardPromises);
+            console.log(
+              `📈 Updated leaderboard data for ${leaderboardPromises.length} players (including guests)`
+            );
+          } catch (leaderboardError) {
+            console.error(
+              "❌ Error updating leaderboard data:",
+              leaderboardError.message
+            );
+            console.error(
+              "❌ Full leaderboard error details:",
+              leaderboardError
+            );
+          }
+        } else {
+          console.log("📈 No leaderboard updates to perform - missing eventId");
         }
 
         // Generate final leaderboard data for broadcast
@@ -1549,7 +1636,7 @@ class BossSessionManager {
         );
 
         // Broadcast final leaderboards to all clients
-        if (finalLeaderboards) {
+        if (finalLeaderboards && this.io) {
           this.io.to(`boss-${eventBossId}`).emit("final-leaderboards", {
             eventBossId,
             teamLeaderboard: finalLeaderboards.teamLeaderboard,
@@ -1574,34 +1661,6 @@ class BossSessionManager {
       } catch (leaderboardError) {
         console.error("Error updating leaderboard data:", leaderboardError);
         // Don't fail the entire boss defeat process for leaderboard errors
-      }
-
-      // **UPDATE DATABASE BOSS SESSION RECORD**
-      if (session.bossSessionId) {
-        try {
-          const totalDamageDealt = Array.from(session.teams.values()).reduce(
-            (sum, team) => sum + team.totalDamage,
-            0
-          );
-
-          await BossSession.update(
-            {
-              endTime: new Date(),
-              finalDamageDealt: totalDamageDealt,
-            },
-            {
-              where: { id: session.bossSessionId },
-            }
-          );
-
-          console.log(`📊 [BOSS SESSION] Updated database record:`, {
-            sessionId: session.bossSessionId,
-            endTime: new Date(),
-            finalDamageDealt: totalDamageDealt,
-          });
-        } catch (dbError) {
-          console.error("Error updating boss session record:", dbError);
-        }
       }
 
       // **UPDATE BOSS STATUS TO COOLDOWN**
@@ -2022,11 +2081,14 @@ class BossSessionManager {
       let allTimeLeaderboard = null;
       if (session.eventId) {
         try {
-          allTimeLeaderboard = await LeaderboardService.getAllTimeLeaderboard(
-            session.eventId
-          );
+          // Get event-specific leaderboard with no limit (get all records)
+          allTimeLeaderboard =
+            await LeaderboardService.getEventOverallLeaderboard(
+              session.eventId
+              // No limit parameter = get all records
+            );
         } catch (error) {
-          console.error("Error fetching all-time leaderboard:", error);
+          console.error("Error fetching event leaderboard:", error);
         }
       }
 
@@ -2048,6 +2110,104 @@ class BossSessionManager {
       console.error("Error generating final leaderboards:", error);
       return null;
     }
+  }
+
+  // **Real-time milestone badge checking during battle**
+  async checkAndAwardMilestoneBadges(
+    eventBossId,
+    playerId,
+    currentCorrectAnswers
+  ) {
+    try {
+      const session = this.sessions.get(eventBossId);
+      if (!session) {
+        console.log(`🎖️ [MILESTONE] No session found for ${eventBossId}`);
+        return [];
+      }
+
+      const player = session.players.get(playerId);
+      if (!player) {
+        console.log(`🎖️ [MILESTONE] No player found for ${playerId}`);
+        return [];
+      }
+
+      // Calculate event-wide total correct answers for this player
+      const eventWideTotal =
+        await BadgeService.calculateEventWideCorrectAnswers(
+          player.userId || playerId, // Use userId for auth users, playerId for guests
+          session.eventId,
+          this
+        );
+
+      console.log(
+        `🎖️ [MILESTONE CHECK] Player ${player.nickname} (${
+          player.userId || "GUEST"
+        })`
+      );
+      console.log(
+        `🎖️ [MILESTONE CHECK] Current session correct: ${currentCorrectAnswers}`
+      );
+      console.log(`🎖️ [MILESTONE CHECK] Event-wide total: ${eventWideTotal}`);
+
+      // Check for milestone badges using event-wide total
+      const milestoneBadges = await BadgeService.checkMilestoneProgress(
+        player.userId || playerId, // Use userId for auth users, playerId for guests
+        session.eventId,
+        eventWideTotal,
+        (badgeNotification) => {
+          // Real-time socket notification callback
+          this.broadcastBadgeNotification(eventBossId, badgeNotification);
+        }
+      );
+
+      if (milestoneBadges.length > 0) {
+        console.log(
+          `🎖️ [NEW MILESTONES] ${milestoneBadges.length} new milestone badges awarded!`
+        );
+        milestoneBadges.forEach((badge) => {
+          console.log(
+            `🎖️ [FRONTEND] Badge Name: ${badge.badge.name}, Player: ${player.nickname}, Milestone: ${badge.badge.milestone}`
+          );
+        });
+      }
+
+      return milestoneBadges;
+    } catch (error) {
+      console.error("Error checking milestone badges:", error);
+      return [];
+    }
+  }
+
+  // Broadcast badge notification to all players in the session
+  broadcastBadgeNotification(eventBossId, badgeNotification) {
+    try {
+      const session = this.sessions.get(eventBossId);
+      if (!session) return;
+
+      console.log(
+        `📢 [BADGE BROADCAST] Broadcasting badge notification: ${badgeNotification.badge.name}`
+      );
+
+      // Emit to all players in the session
+      for (const [socketId, playerSessionInfo] of this.playerSessions) {
+        if (playerSessionInfo.eventBossId === eventBossId) {
+          // This would need to be connected to your socket.io instance
+          // For now, we'll log it for frontend visibility
+          console.log(
+            `📢 [FRONTEND NOTIFICATION] Sending to ${
+              playerSessionInfo.nickname
+            }: ${JSON.stringify(badgeNotification)}`
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error broadcasting badge notification:", error);
+    }
+  }
+
+  // Helper method to get all sessions (for badge service)
+  getAllSessions() {
+    return this.sessions;
   }
 }
 
