@@ -26,13 +26,13 @@ PlayerSession.belongsTo(User, { foreignKey: "userId", as: "user" });
 Event.hasMany(PlayerSession, { foreignKey: "eventId", as: "playerSessions" });
 PlayerSession.belongsTo(Event, { foreignKey: "eventId", as: "event" });
 
+// User and Question associations
+User.hasMany(Question, { foreignKey: "authorId", as: "createdQuestions" });
+Question.belongsTo(User, { foreignKey: "authorId", as: "creator" });
+
 // User and Category associations
 User.hasMany(Category, { foreignKey: "creatorId", as: "createdCategories" });
 Category.belongsTo(User, { foreignKey: "creatorId", as: "creator" });
-
-// User and Question associations
-User.hasMany(Question, { foreignKey: "authorId", as: "createdQuestions" });
-Question.belongsTo(User, { foreignKey: "authorId", as: "author" });
 
 // EventBoss and Event associations
 Event.hasMany(EventBoss, { foreignKey: "eventId", as: "eventBosses" });
@@ -50,12 +50,12 @@ EventBoss.belongsTo(Boss, {
   onDelete: "CASCADE",
 });
 
-// Boss and Category associations (many-to-many)
+// Boss and Category associations
 Boss.belongsToMany(Category, {
   through: "boss_categories",
   foreignKey: "bossId",
   otherKey: "categoryId",
-  as: "categories",
+  as: "Categories",
 });
 Category.belongsToMany(Boss, {
   through: "boss_categories",
