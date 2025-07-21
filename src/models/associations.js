@@ -95,7 +95,7 @@ UserBadge.belongsTo(Badge, {
 EventBoss.hasMany(UserBadge, { foreignKey: "eventBossId", as: "badges" });
 UserBadge.belongsTo(EventBoss, {
   foreignKey: "eventBossId",
-  as: "eventBoss",
+  as: "eventBossForBadge",
   onDelete: "CASCADE",
 });
 
@@ -107,15 +107,42 @@ UserBadge.belongsTo(Event, {
   onDelete: "CASCADE",
 });
 
-// Leaderboard and EventBoss associations
+// **LEADERBOARD ASSOCIATIONS**
+// Note: playerId can be either User.id (for authenticated users) or PlayerSession.id (for guests)
+// These associations are optional since we handle mixed ID types
+
+// Leaderboard to EventBoss (required association)
 EventBoss.hasMany(Leaderboard, {
   foreignKey: "eventBossId",
-  as: "leaderboards",
+  as: "leaderboardEntries",
 });
 Leaderboard.belongsTo(EventBoss, {
   foreignKey: "eventBossId",
   as: "eventBoss",
-  onDelete: "CASCADE",
+});
+
+// Optional associations for when playerId is a User.id
+User.hasMany(Leaderboard, {
+  foreignKey: "playerId",
+  as: "leaderboardEntries",
+  constraints: false,
+});
+Leaderboard.belongsTo(User, {
+  foreignKey: "playerId",
+  as: "user",
+  constraints: false,
+});
+
+// Optional associations for when playerId is a PlayerSession.id
+PlayerSession.hasMany(Leaderboard, {
+  foreignKey: "playerId",
+  as: "leaderboardEntries",
+  constraints: false,
+});
+Leaderboard.belongsTo(PlayerSession, {
+  foreignKey: "playerId",
+  as: "playerSession",
+  constraints: false,
 });
 
 export {

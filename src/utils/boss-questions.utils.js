@@ -5,6 +5,8 @@ import {
   Question,
   AnswerChoice,
 } from "../models/index.js";
+import RandomGenerator from "./random-generator.js";
+import { createQuestionSelectionSeed } from "./game.constants.js";
 
 /**
  * Fetch questions and answer choices for a boss by eventBossId and joinCode
@@ -79,12 +81,20 @@ export const getBossQuestionsAndAnswers = async (eventBossId, joinCode) => {
  * Get random questions from each category for a boss battle
  * @param {number} eventBossId - The ID of the event boss
  * @param {string} joinCode - The join code for the boss
+ * @param {string} bossSessionId - The boss session ID for seeding
+ * @param {string} roomCode - The room code for seeding
+ * @param {number} numberOfTeams - Number of teams for seeding
+ * @param {number} numberOfPlayers - Number of players for seeding
  * @param {number} questionsPerCategory - Number of questions to get per category
  * @returns {Object|null} - Object containing random questions or null if not found
  */
 export const getRandomBossQuestions = async (
   eventBossId,
   joinCode,
+  bossSessionId,
+  roomCode,
+  numberOfTeams,
+  numberOfPlayers,
   questionsPerCategory = 5
 ) => {
   try {
@@ -94,21 +104,35 @@ export const getRandomBossQuestions = async (
       return null;
     }
 
-    // Get random questions from each category
-    const randomQuestionsData = bossData.questionsData.map((category) => {
-      const shuffledQuestions = [...category.questions].sort(
-        () => 0.5 - Math.random()
-      );
-      const selectedQuestions = shuffledQuestions.slice(
-        0,
-        questionsPerCategory
-      );
+    // Get random questions from each category using seeded randomization
+    const randomQuestionsData = bossData.questionsData.map(
+      (category, categoryIndex) => {
+        // Create unique seed for this category's question selection
+        const seed = createQuestionSelectionSeed(
+          bossSessionId,
+          eventBossId,
+          roomCode,
+          joinCode,
+          numberOfTeams,
+          numberOfPlayers,
+          category.categoryId
+        );
 
-      return {
-        ...category,
-        questions: selectedQuestions,
-      };
-    });
+        const generator = new RandomGenerator(seed);
+
+        // Use seeded shuffle instead of Math.random
+        const shuffledQuestions = generator.shuffle([...category.questions]);
+        const selectedQuestions = shuffledQuestions.slice(
+          0,
+          questionsPerCategory
+        );
+
+        return {
+          ...category,
+          questions: selectedQuestions,
+        };
+      }
+    );
 
     return {
       bossId: bossData.bossId,

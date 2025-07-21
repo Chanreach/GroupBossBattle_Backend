@@ -25,12 +25,22 @@ export const getResponseTimeCategory = (responseTime, questionTimeLimit) => {
   const timeRatio = responseTime / timeLimitMs;
 
   // Debug logging for response time categorization
-  console.log("📊 =============== RESPONSE TIME CATEGORY DEBUG ===============");
-  console.log(`⚡ Response Time: ${responseTime}ms (${(responseTime/1000).toFixed(2)}s)`);
+  console.log(
+    "📊 =============== RESPONSE TIME CATEGORY DEBUG ==============="
+  );
+  console.log(
+    `⚡ Response Time: ${responseTime}ms (${(responseTime / 1000).toFixed(2)}s)`
+  );
   console.log(`⏱️  Time Limit: ${questionTimeLimit}s (${timeLimitMs}ms)`);
-  console.log(`📈 Time Ratio: ${responseTime}ms ÷ ${timeLimitMs}ms = ${timeRatio.toFixed(3)}`);
-  console.log(`🎯 Thresholds: FAST ≤ ${GAME_CONSTANTS.RESPONSE_TIME_THRESHOLDS.FAST}, NORMAL ≤ ${GAME_CONSTANTS.RESPONSE_TIME_THRESHOLDS.NORMAL}`);
-  
+  console.log(
+    `📈 Time Ratio: ${responseTime}ms ÷ ${timeLimitMs}ms = ${timeRatio.toFixed(
+      3
+    )}`
+  );
+  console.log(
+    `🎯 Thresholds: FAST ≤ ${GAME_CONSTANTS.RESPONSE_TIME_THRESHOLDS.FAST}, NORMAL ≤ ${GAME_CONSTANTS.RESPONSE_TIME_THRESHOLDS.NORMAL}`
+  );
+
   let category;
   if (timeRatio <= GAME_CONSTANTS.RESPONSE_TIME_THRESHOLDS.FAST) {
     category = "FAST";
@@ -39,15 +49,70 @@ export const getResponseTimeCategory = (responseTime, questionTimeLimit) => {
   } else {
     category = "SLOW";
   }
-  
-  console.log(`🏆 Result: ${category} (${(timeRatio * 100).toFixed(1)}% of time limit used)`);
-  console.log("📊 =============================================================");
-  
+
+  console.log(
+    `🏆 Result: ${category} (${(timeRatio * 100).toFixed(
+      1
+    )}% of time limit used)`
+  );
+  console.log(
+    "📊 ============================================================="
+  );
+
   return category;
 };
 
-export const createTeamAssignmentSeed = (sessionId, playerOrder = 0) => {
-  const input = `${sessionId}_team_assignment_${playerOrder}`;
+export const createTeamAssignmentSeed = (
+  bossSessionId,
+  eventBossId,
+  roomCode,
+  joinCode,
+  numberOfTeams,
+  numberOfPlayers,
+  playerOrder = 0
+) => {
+  const timestamp = Date.now();
+  const input = `${bossSessionId}_${eventBossId}_${roomCode}_${joinCode}_teams${numberOfTeams}_players${numberOfPlayers}_order${playerOrder}_${timestamp}`;
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+};
+
+export const createQuestionSelectionSeed = (
+  bossSessionId,
+  eventBossId,
+  roomCode,
+  joinCode,
+  numberOfTeams,
+  numberOfPlayers,
+  categoryId = 0
+) => {
+  const timestamp = Date.now();
+  const input = `${bossSessionId}_${eventBossId}_${roomCode}_${joinCode}_teams${numberOfTeams}_players${numberOfPlayers}_questions_cat${categoryId}_${timestamp}`;
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+};
+
+export const createRevivalCodeSeed = (
+  bossSessionId,
+  eventBossId,
+  roomCode,
+  joinCode,
+  numberOfTeams,
+  numberOfPlayers,
+  playerId
+) => {
+  const timestamp = Date.now();
+  const input = `${bossSessionId}_${eventBossId}_${roomCode}_${joinCode}_teams${numberOfTeams}_players${numberOfPlayers}_revival_${playerId}_${timestamp}`;
   let hash = 0;
   for (let i = 0; i < input.length; i++) {
     const char = input.charCodeAt(i);

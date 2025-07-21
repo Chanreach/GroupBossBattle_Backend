@@ -1,5 +1,5 @@
 import BadgeService from "./src/services/badge.service.js";
-import { sequelize } from "./src/config/db.js";
+import sequelize from "./src/config/db.js";
 
 /**
  * Initialize Default Badges Script
@@ -60,8 +60,6 @@ async function initializeBadges() {
 }
 
 // Run the initialization
-if (import.meta.url === `file://${process.argv[1]}`) {
-  initializeBadges();
-}
+initializeBadges();
 
 export default initializeBadges;

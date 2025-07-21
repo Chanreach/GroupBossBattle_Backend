@@ -5,30 +5,76 @@
  * These codes can be used by other players to revive teammates
  */
 
+import RandomGenerator from "./random-generator.js";
+import { createRevivalCodeSeed } from "./game.constants.js";
+
 /**
- * Generate a random revival code
+ * Generate a seeded revival code
+ * @param {string} bossSessionId - The boss session ID for seeding
+ * @param {number} eventBossId - The event boss ID for seeding
+ * @param {string} roomCode - The room code for seeding
+ * @param {string} joinCode - The join code for seeding
+ * @param {number} numberOfTeams - Number of teams for seeding
+ * @param {number} numberOfPlayers - Number of players for seeding
+ * @param {string} playerId - The player ID requesting revival
  * @param {number} length - Length of the code (default: 6)
  * @returns {string} - Generated revival code
  */
-export function generateRevivalCode(length = 6) {
+export function generateRevivalCode(
+  bossSessionId,
+  eventBossId,
+  roomCode,
+  joinCode,
+  numberOfTeams,
+  numberOfPlayers,
+  playerId,
+  length = 6
+) {
   const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+  // Create unique seed for this revival code
+  const seed = createRevivalCodeSeed(
+    bossSessionId,
+    eventBossId,
+    roomCode,
+    joinCode,
+    numberOfTeams,
+    numberOfPlayers,
+    playerId
+  );
+
+  const generator = new RandomGenerator(seed);
   let result = "";
 
   for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
+    result += characters.charAt(generator.randomInt(0, characters.length - 1));
   }
 
   return result;
 }
 
 /**
- * Generate a unique revival code (ensures uniqueness against existing codes)
+ * Generate a unique seeded revival code (ensures uniqueness against existing codes)
+ * @param {string} bossSessionId - The boss session ID for seeding
+ * @param {number} eventBossId - The event boss ID for seeding
+ * @param {string} roomCode - The room code for seeding
+ * @param {string} joinCode - The join code for seeding
+ * @param {number} numberOfTeams - Number of teams for seeding
+ * @param {number} numberOfPlayers - Number of players for seeding
+ * @param {string} playerId - The player ID requesting revival
  * @param {Set|Array} existingCodes - Set or array of existing codes to avoid duplicates
  * @param {number} length - Length of the code (default: 6)
  * @param {number} maxAttempts - Maximum attempts to generate unique code (default: 100)
  * @returns {string} - Generated unique revival code
  */
 export function generateUniqueRevivalCode(
+  bossSessionId,
+  eventBossId,
+  roomCode,
+  joinCode,
+  numberOfTeams,
+  numberOfPlayers,
+  playerId,
   existingCodes = new Set(),
   length = 6,
   maxAttempts = 100
@@ -37,7 +83,18 @@ export function generateUniqueRevivalCode(
     existingCodes instanceof Set ? existingCodes : new Set(existingCodes);
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const code = generateRevivalCode(length);
+    // Include attempt number in the playerId for unique seeding
+    const attemptPlayerId = `${playerId}_attempt${attempt}`;
+    const code = generateRevivalCode(
+      bossSessionId,
+      eventBossId,
+      roomCode,
+      joinCode,
+      numberOfTeams,
+      numberOfPlayers,
+      attemptPlayerId,
+      length
+    );
     if (!existingSet.has(code)) {
       return code;
     }
@@ -45,7 +102,17 @@ export function generateUniqueRevivalCode(
 
   // If we can't generate a unique code after maxAttempts,
   // increase length and try once more
-  const longerCode = generateRevivalCode(length + 1);
+  const longerAttemptPlayerId = `${playerId}_longer`;
+  const longerCode = generateRevivalCode(
+    bossSessionId,
+    eventBossId,
+    roomCode,
+    joinCode,
+    numberOfTeams,
+    numberOfPlayers,
+    longerAttemptPlayerId,
+    length + 1
+  );
   if (!existingSet.has(longerCode)) {
     return longerCode;
   }

@@ -300,7 +300,9 @@ const handleCombat = (io, socket) => {
           playerSession.playerId,
           isCorrect,
           timeTaken,
-          questionData.timeLimit
+          questionData.timeLimit,
+          null,
+          io
         );
 
         if (result) {
@@ -726,7 +728,8 @@ async function handleBossDefeated(io, eventBossId, result) {
 
     const endResult = await bossSessionManager.endBossFight(
       eventBossId,
-      result.finalHitBy
+      result.finalHitBy,
+      io
     );
 
     if (endResult && endResult.session) {
@@ -760,14 +763,11 @@ async function handleBossDefeated(io, eventBossId, result) {
               mvpAwarded: !!awardedBadges.mvp,
               lastHitAwarded: !!awardedBadges.lastHit,
               bossDefeatedCount: awardedBadges.bossDefeated.length,
-              milestoneAwards: awardedBadges.milestones.map((m) => ({
-                playerId: m.playerId,
-                playerNickname: m.playerNickname,
-                badgeCount: m.badges.length,
-                badges: m.badges.map((b) => ({
-                  name: b.badgeInfo.name,
-                  milestone: b.milestone,
-                })),
+              milestoneAwards: awardedBadges.milestones.map((badge) => ({
+                playerId: badge.playerId,
+                playerNickname: badge.playerNickname,
+                badgeName: badge.name,
+                milestone: badge.milestone,
               })),
             }
           : null,
@@ -860,21 +860,19 @@ async function handleBossDefeated(io, eventBossId, result) {
         }
 
         // Notify milestone badge recipients
-        awardedBadges.milestones.forEach((milestonePlayer) => {
-          const player = session.players.get(milestonePlayer.playerId);
+        awardedBadges.milestones.forEach((badge) => {
+          const player = session.players.get(badge.playerId);
           if (player) {
             const playerSocket = io.sockets.sockets.get(player.socketId);
             if (playerSocket) {
-              milestonePlayer.badges.forEach((badgeInfo) => {
-                playerSocket.emit("badge-earned", {
-                  type: "Milestone",
-                  badgeId: badgeInfo.badge.badgeId,
-                  badgeName: badgeInfo.badgeInfo.name, // Include the badge name
-                  message: `🎖️ Congratulations! You earned the ${badgeInfo.badgeInfo.name} milestone badge!`,
-                  milestone: badgeInfo.milestone,
-                  eventBossId,
-                  isBattleEnd: true, // Flag to indicate this is a battle-end notification
-                });
+              playerSocket.emit("badge-earned", {
+                type: "Milestone",
+                badgeId: badge.id,
+                badgeName: badge.name,
+                message: `🎖️ Congratulations! You earned the ${badge.name} milestone badge!`,
+                milestone: badge.milestone,
+                eventBossId,
+                isBattleEnd: true, // Flag to indicate this is a battle-end notification
               });
             }
           }

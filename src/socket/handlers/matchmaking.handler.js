@@ -28,6 +28,7 @@ const handleMatchmaking = (io, socket) => {
       }
 
       socket.join(`boss-${eventBossId}`);
+      socket.join(`boss-preview-${eventBossId}`); // Separate room for preview updates
 
       // Get current session data and send to the new viewer
       const session = bossSessionManager.getSession(eventBossId);
@@ -54,9 +55,57 @@ const handleMatchmaking = (io, socket) => {
         message: "Successfully joined boss preview",
         session: sessionData,
       });
+
+      // Send initial leaderboard data
+      try {
+        const leaderboardData =
+          await bossSessionManager.getComprehensiveLeaderboardData(eventBossId);
+        socket.emit("boss-preview:leaderboard-update", {
+          leaderboardData: leaderboardData,
+        });
+      } catch (leaderboardError) {
+        console.error(
+          "Error sending initial leaderboard data:",
+          leaderboardError
+        );
+      }
     } catch (error) {
       console.error("Error in boss-preview:join:", error);
       socket.emit("error", { message: "Internal server error" });
+    }
+  });
+
+  // Request leaderboard data explicitly
+  socket.on("boss-preview:request-leaderboard", async (data) => {
+    try {
+      const { eventBossId } = data;
+
+      if (!eventBossId) {
+        socket.emit("error", { message: "Missing eventBossId" });
+        return;
+      }
+
+      const leaderboardData =
+        await bossSessionManager.getComprehensiveLeaderboardData(eventBossId);
+      socket.emit("boss-preview:leaderboard-update", {
+        leaderboardData: leaderboardData,
+      });
+    } catch (error) {
+      console.error("Error handling leaderboard request:", error);
+      socket.emit("error", { message: "Failed to get leaderboard data" });
+    }
+  });
+
+  // Leave boss preview
+  socket.on("boss-preview:leave", (data) => {
+    try {
+      const { eventBossId } = data || {};
+      if (eventBossId) {
+        socket.leave(`boss-${eventBossId}`);
+        socket.leave(`boss-preview-${eventBossId}`);
+      }
+    } catch (error) {
+      console.error("Error in boss-preview:leave:", error);
     }
   });
 

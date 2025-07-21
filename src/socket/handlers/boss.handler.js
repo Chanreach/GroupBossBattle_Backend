@@ -44,9 +44,10 @@ const handleBoss = (io, socket) => {
 
       // Check if there are enough players to start (same requirement as auto-start)
       if (!bossSessionManager.canStartBattle(eventBossId)) {
-        const playersNeeded = GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED - session.players.size;
-        socket.emit("error", { 
-          message: `Not enough players to start battle. Need ${playersNeeded} more player(s).` 
+        const playersNeeded =
+          GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED - session.players.size;
+        socket.emit("error", {
+          message: `Not enough players to start battle. Need ${playersNeeded} more player(s).`,
         });
         return;
       }
@@ -109,7 +110,7 @@ const handleBoss = (io, socket) => {
       }
 
       // End the battle
-      const result = bossSessionManager.endBossFight(eventBossId);
+      const result = bossSessionManager.endBossFight(eventBossId, null, io);
 
       if (result) {
         // Notify all players that battle has ended
@@ -309,7 +310,7 @@ const handleBoss = (io, socket) => {
 
       // End current battle if active
       if (session.isStarted) {
-        bossSessionManager.endBossFight(eventBossId);
+        bossSessionManager.endBossFight(eventBossId, null, io);
       }
 
       // Reset boss data
