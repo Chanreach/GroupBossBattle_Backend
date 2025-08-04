@@ -47,7 +47,7 @@ export function generateRevivalCode(
   let result = "";
 
   for (let i = 0; i < length; i++) {
-    result += characters.charAt(generator.randomInt(0, characters.length - 1));
+    result += characters.charAt(generator.getRandomInt(0, characters.length - 1));
   }
 
   return result;

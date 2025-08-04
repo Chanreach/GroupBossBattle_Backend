@@ -10,7 +10,6 @@ import bossSessionManager from "../managers/boss-session.manager.js";
 import { GAME_CONSTANTS } from "../../utils/game.constants.js";
 
 const handleMatchmaking = (io, socket) => {
-  // Join boss preview (when player scans QR and enters the preview page)
   socket.on("boss-preview:join", async (data) => {
     try {
       const { eventBossId, joinCode } = data;
@@ -503,98 +502,6 @@ const handleMatchmaking = (io, socket) => {
       // Silent fail for reconnection errors
     }
   });
-
-  // Player confirms they want to join the battle
-  // socket.on("join-boss-fight", async (data) => {
-  //   try {
-  //     const { eventBossId } = data;
-  //     const playerSession = bossSessionManager.getPlayerSession(socket.id);
-
-  //     if (!playerSession || playerSession.eventBossId !== eventBossId) {
-  //       socket.emit("error", { message: "Player session not found" });
-  //       return;
-  //     }
-
-  //     const session = bossSessionManager.getSession(eventBossId);
-  //     if (!session) {
-  //       socket.emit("error", { message: "Boss session not found" });
-  //       return;
-  //     }
-
-  //     // Check if boss is on cooldown
-  //     if (
-  //       session.bossData.cooldownUntil &&
-  //       new Date() < session.bossData.cooldownUntil
-  //     ) {
-  //       const remainingTime = Math.ceil(
-  //         (session.bossData.cooldownUntil - new Date()) / 1000
-  //       );
-  //       socket.emit("boss-on-cooldown", {
-  //         message: "Boss is on cooldown",
-  //         remainingTime,
-  //       });
-  //       return;
-  //     }
-
-  //     // Check if battle is already started
-  //     if (session.isStarted) {
-  //       socket.emit("error", { message: "Battle already in progress" });
-  //       return;
-  //     }
-
-  //     // Player is ready to fight
-  //     const player = session.players.get(playerSession.playerId);
-  //     if (player) {
-  //       player.status = "ready";
-  //     }
-
-  //     socket.emit("joined-boss-fight", {
-  //       message: "Ready to fight! Waiting for other players...",
-  //       session: {
-  //         eventBossId: session.eventBossId,
-  //         bossData: session.bossData,
-  //         playerCount: session.players.size,
-  //       },
-  //     });
-
-  //     // Check if we can start the battle
-  //     if (bossSessionManager.canStartBattle(eventBossId)) {
-  //       // Start the battle
-  //       const battleStartResult = await bossSessionManager.startBossFight(
-  //         eventBossId
-  //       );
-
-  //       if (battleStartResult && battleStartResult.success) {
-  //         // Notify all players that battle has started
-  //         io.to(`boss-${eventBossId}`).emit("battle-started", {
-  //           session: {
-  //             eventBossId: session.eventBossId,
-  //             bossData: session.bossData,
-  //             teams: Array.from(session.teams.values()).map((team) => ({
-  //               id: team.id,
-  //               name: team.name,
-  //               playerCount: team.players.size,
-  //               totalDamage: team.totalDamage,
-  //             })),
-  //             players: Array.from(session.players.values()).map((p) => ({
-  //               id: p.id,
-  //               nickname: p.nickname,
-  //               teamId: p.teamId,
-  //               hearts: p.hearts,
-  //               status: p.status,
-  //             })),
-  //           },
-  //           questionPoolAssignments: battleStartResult.questionPoolAssignments,
-  //         });
-
-  //         console.log(`Battle started for boss ${eventBossId}`);
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error("Error in join-boss-fight:", error);
-  //     socket.emit("error", { message: "Internal server error" });
-  //   }
-  // });
 
   // Player leaves the session
   socket.on("leave-boss-session", () => {

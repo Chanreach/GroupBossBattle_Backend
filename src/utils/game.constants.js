@@ -1,11 +1,18 @@
+// ===== GAME CONSTANTS ===== //
+
 export const GAME_CONSTANTS = {
   MINIMUM_HP_THRESHOLD: 30,
   HP_SCALING_PER_PLAYER: 15,
   TEAM_SCALING_FACTOR: 0.2,
-
+  
   MINIMUM_PLAYERS_REQUIRED: 2,
+  PLAYER_STARTING_HEARTS: 3,
+  REVIVAL_TIMEOUT: 60000,
 
-  BASE_DAMAGE: 1,
+  DEFAULT_QUESTION_TIME_LIMIT: 30000,
+  MINIMUM_ANSWER_CHOICES: 4,
+  TOTAL_ANSWER_CHOICES: 8,
+
   DAMAGE_MULTIPLIERS: {
     FAST: 1.5,
     NORMAL: 1.0,
@@ -17,29 +24,18 @@ export const GAME_CONSTANTS = {
     NORMAL: 0.66,
     SLOW: 1.0,
   },
+
+  BOSS_STATUSES: {
+    ACTIVE: "active",
+    IN_BATTLE: "in-battle",
+    DEFEATED: "defeated",
+    COOLDOWN: "cooldown",
+  }
 };
 
 export const getResponseTimeCategory = (responseTime, questionTimeLimit) => {
-  // Convert questionTimeLimit from seconds to milliseconds for proper comparison
   const timeLimitMs = questionTimeLimit * 1000;
   const timeRatio = responseTime / timeLimitMs;
-
-  // Debug logging for response time categorization
-  console.log(
-    "📊 =============== RESPONSE TIME CATEGORY DEBUG ==============="
-  );
-  console.log(
-    `⚡ Response Time: ${responseTime}ms (${(responseTime / 1000).toFixed(2)}s)`
-  );
-  console.log(`⏱️  Time Limit: ${questionTimeLimit}s (${timeLimitMs}ms)`);
-  console.log(
-    `📈 Time Ratio: ${responseTime}ms ÷ ${timeLimitMs}ms = ${timeRatio.toFixed(
-      3
-    )}`
-  );
-  console.log(
-    `🎯 Thresholds: FAST ≤ ${GAME_CONSTANTS.RESPONSE_TIME_THRESHOLDS.FAST}, NORMAL ≤ ${GAME_CONSTANTS.RESPONSE_TIME_THRESHOLDS.NORMAL}`
-  );
 
   let category;
   if (timeRatio <= GAME_CONSTANTS.RESPONSE_TIME_THRESHOLDS.FAST) {
@@ -49,15 +45,6 @@ export const getResponseTimeCategory = (responseTime, questionTimeLimit) => {
   } else {
     category = "SLOW";
   }
-
-  console.log(
-    `🏆 Result: ${category} (${(timeRatio * 100).toFixed(
-      1
-    )}% of time limit used)`
-  );
-  console.log(
-    "📊 ============================================================="
-  );
 
   return category;
 };

@@ -5,7 +5,7 @@ class RandomGenerator {
   }
 
   next() {
-    this._a += 0x6D2B79F5;
+    this._a += 0x6d2b79f5;
     let t = this._a;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -24,28 +24,41 @@ class RandomGenerator {
     this._a = this._initialSeed;
   }
 
-  randomInt(min, max) {
+  getRandomInt(min, max) {
     return Math.floor(this.next() * (max - min + 1)) + min;
   }
 
-  randomFloat(min = 0, max = 1) {
+  getRandomFloat(min = 0, max = 1) {
     return this.next() * (max - min) + min;
   }
 
-  randomBool(probability = 0.5) {
+  getRandomBool(probability = 0.5) {
     return this.next() < probability;
   }
 
-  randomChoice(array) {
+  getRandomElement(array) {
     if (!Array.isArray(array) || array.length === 0) return undefined;
-    return array[this.randomInt(0, array.length - 1)];
+    return array[this.getRandomInt(0, array.length - 1)];
   }
 
-  shuffle(array) {
+  getRandomElements(array, count) {
+    if (!Array.isArray(array) || array.length === 0 || count <= 0) return [];
+    if (count >= array.length) return [...array];
+    const result = [];
+    const copy = [...array];
+    for (let i = 0; i < count && copy.length > 0; i++) {
+      const index = this.getRandomInt(0, copy.length - 1);
+      result.push(copy[index]);
+      copy.splice(index, 1);
+    }
+    return result;
+  }
+
+  shuffleArray(array) {
     if (!Array.isArray(array) || array.length === 0) return [];
     const copy = [...array];
     for (let i = copy.length - 1; i > 0; i--) {
-      const j = this.randomInt(0, i);
+      const j = this.getRandomInt(0, i);
       [copy[i], copy[j]] = [copy[j], copy[i]];
     }
     return copy;

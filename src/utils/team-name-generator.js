@@ -119,12 +119,12 @@ class TeamNameGenerator {
     while (attempts < maxAttempts) {
       let teamName, animal, adjective;
 
-      animal = randomGenerator.randomChoice(
+      animal = randomGenerator.getRandomElement(
         availableAnimals.length > 0 ? availableAnimals : ANIMALS
       );
 
       if (useAdjective) {
-        adjective = randomGenerator.randomChoice(
+        adjective = randomGenerator.getRandomElement(
           availableAdjectives.length > 0 ? availableAdjectives : ADJECTIVES
         );
         teamName = `${adjective} ${animal}`;
@@ -147,11 +147,11 @@ class TeamNameGenerator {
       attempts++;
     }
 
-    const animal = randomGenerator.randomChoice(ANIMALS);
+    const animal = randomGenerator.getRandomElement(ANIMALS);
     usedAnimals.add(animal.toLowerCase());
     const timestamp = Date.now().toString().slice(-3);
     if (useAdjective) {
-      const adjective = randomGenerator.randomChoice(ADJECTIVES);
+      const adjective = randomGenerator.getRandomElement(ADJECTIVES);
       adjectiveUsage[adjective] = (adjectiveUsage[adjective] || 0) + 1;
       return `${adjective} ${animal} ${timestamp}`;
     } else {

@@ -121,7 +121,7 @@ export const getRandomBossQuestions = async (
         const generator = new RandomGenerator(seed);
 
         // Use seeded shuffle instead of Math.random
-        const shuffledQuestions = generator.shuffle([...category.questions]);
+        const shuffledQuestions = generator.shuffleArray([...category.questions]);
         const selectedQuestions = shuffledQuestions.slice(
           0,
           questionsPerCategory
