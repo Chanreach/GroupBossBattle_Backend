@@ -24,7 +24,7 @@ import badgeRoutes from "./routes/badge.routes.js";
 import leaderboardRoutes from "./routes/leaderboard.routes.js";
 
 import "./schedulers/event-status-updater.js";
-import setupSocket from "./socket/index.js";
+import setupSocket from "./socket2/index.js";
 
 dotenv.config();
 
