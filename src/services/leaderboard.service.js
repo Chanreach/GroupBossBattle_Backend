@@ -9,10 +9,6 @@ import {
 import { Op } from "sequelize";
 
 class LeaderboardService {
-  /**
-   * Update player leaderboard - Updated for simplified schema
-   * Note: This method is kept for compatibility but we now mainly use BossSessionManager.updatePlayerLeaderboard
-   */
   static async updatePlayerLeaderboard(
     playerId,
     eventBossId,
@@ -46,13 +42,6 @@ class LeaderboardService {
     }
   }
 
-  /**
-   * Get event overall leaderboard - no limit, get all records
-   */
-  /**
-   * Get event overall leaderboard - Updated for new schema
-   * Since we only track per-eventBoss, we'll aggregate across all bosses in an event
-   */
   static async getEventOverallLeaderboard(eventId, limit = 50) {
     try {
       // First get all eventBoss IDs for this event
@@ -126,9 +115,6 @@ class LeaderboardService {
     }
   }
 
-  /**
-   * Get boss-specific leaderboard - Updated for new schema
-   */
   static async getBossSpecificLeaderboard(eventId, eventBossId, limit = 50) {
     try {
       const leaderboardEntries = await Leaderboard.findAll({
@@ -249,12 +235,6 @@ class LeaderboardService {
     }
   }
 
-  /**
-   * Get boss all-time leaderboard (specific boss across all events) - no limit
-   */
-  /**
-   * Get all-time leaderboard for a specific boss (across all events) - Updated for new schema
-   */
   static async getBossAllTimeLeaderboard(bossId, limit = 50) {
     try {
       // First get all eventBoss IDs for this boss
@@ -436,9 +416,6 @@ class LeaderboardService {
     }
   }
 
-  /**
-   * Get player's rank in event overall leaderboard
-   */
   static async getPlayerEventRank(playerId, eventId) {
     try {
       const leaderboard = await this.getEventOverallLeaderboard(eventId);

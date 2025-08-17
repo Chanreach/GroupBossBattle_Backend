@@ -120,4 +120,5 @@ class KnockoutManager {
   }
 }
 
-export default KnockoutManager;
+const knockoutManager = new KnockoutManager();
+export default knockoutManager;

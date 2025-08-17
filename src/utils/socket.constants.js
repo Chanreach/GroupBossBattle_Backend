@@ -38,7 +38,7 @@ export const SOCKET_EVENTS = {
 
   // ===== NICKNAME EVENTS ===== //
   NICKNAME: {
-    
+    VALIDATION: "nickname:validation"
   },
 
   // ===== BOSS EVENTS ===== //

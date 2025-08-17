@@ -1,3 +1,5 @@
+import { MILESTONE_THRESHOLDS } from "./badge-system";
+
 // ===== GAME CONSTANTS ===== //
 export const GAME_CONSTANTS = {
   MINIMUM_HP_THRESHOLD: 30,
@@ -26,11 +28,38 @@ export const GAME_CONSTANTS = {
     SLOW: 1.0,
   },
 
-  BOSS_STATUSES: {
+  BOSS_STATUS: {
     ACTIVE: "active",
     IN_BATTLE: "in-battle",
     DEFEATED: "defeated",
     COOLDOWN: "cooldown",
+  },
+
+  PLAYER: {
+    CONTEXT_STATUS: {
+      IDLE: "idle",
+      IN_QUEUE: "in-queue",
+      IN_BATTLE: "in-battle",
+      DISCONNECTED: "disconnected",
+    },
+
+    BATTLE_STATE: {
+      ACTIVE: "active",
+      KNOCKOUT: "knockout",
+      DEAD: "dead",
+    }
+  },
+
+  BADGE: {
+    MVP: "mvp",
+    LAST_HIT: "last-hit",
+    BOSS_DEFEATED: "boss-defeated",
+  },
+
+  MILESTONE_THRESHOLDS: {
+    QUESTIONS: {
+      
+    }
   }
 };
 

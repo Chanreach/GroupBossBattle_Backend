@@ -24,7 +24,7 @@ class TeamManager {
       });
     }
   }
-  
+
   getAllTeams() {
     return Array.from(this.teams.values());
   }
@@ -35,10 +35,14 @@ class TeamManager {
     if (teamArray.length === 0) {
       throw new Error("No teams available to assign player to.");
     }
-    
+
     // Find the teams with the minimum number of players
-    const minPlayerCount = Math.min(...teamArray.map(team => team.players.size));
-    const availableTeams = teamArray.filter(team => team.players.size === minPlayerCount);
+    const minPlayerCount = Math.min(
+      ...teamArray.map((team) => team.players.size)
+    );
+    const availableTeams = teamArray.filter(
+      (team) => team.players.size === minPlayerCount
+    );
 
     // Randomly select one of the available teams
     let selectedTeam;
