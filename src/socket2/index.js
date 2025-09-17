@@ -1,7 +1,6 @@
 import handleBossPreview from "./handlers/boss-preview.handler.js";
 import handleMatchmaking from "./handlers/matchmaking.handler.js";
 import handleBattleSession from "./handlers/battle-session.handler.js";
-import handleQuestion from "./handlers/question.handler.js";
 import handleCombat from "./handlers/combat.handler.js";
 import handleKnockout from "./handlers/knockout.handler.js";
 import handleLeaderboard from "./handlers/leaderboard.handler.js";
@@ -13,7 +12,6 @@ const setupSocket = (io) => {
     handleBossPreview(io, socket);
     handleMatchmaking(io, socket);
     handleBattleSession(io, socket);
-    handleQuestion(io, socket);
     handleCombat(io, socket);
     handleKnockout(io, socket);
     handleLeaderboard(io, socket);

@@ -1,14 +1,10 @@
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
-import { generateSeed } from "../utils/seed-generator.js";
+import { generateSeed } from "../utils/generate-seed.js";
 import RandomGenerator from "../utils/random-generator.js";
 import TeamNameGenerator from "../utils/team-name-generator.js";
 
 class TeamManager {
-  constructor() {
-    this.teams = new Map();
-  }
-
-  createTeams(battleSessionId, eventBossId, numberOfTeams) {
+  createTeams(teams, battleSessionId, eventBossId, numberOfTeams) {
     const teamNames = TeamNameGenerator.generateUniqueTeamNames(numberOfTeams, [
       battleSessionId,
       eventBossId,
@@ -17,7 +13,7 @@ class TeamManager {
     ]);
 
     for (let i = 0; i < numberOfTeams; i++) {
-      this.teams.set(i + 1, {
+      teams.set(i + 1, {
         id: i + 1,
         name: teamNames[i],
         players: new Set(),
@@ -25,18 +21,16 @@ class TeamManager {
     }
   }
 
-  getAllTeams() {
-    return Array.from(this.teams.values());
+  getAllTeams(teams) {
+    return Array.from(teams.values());
   }
 
-  assignPlayerToTeam(battleSessionId, playerId) {
-    const teamArray = this.getAllTeams();
-
+  assignPlayerToTeam(teams, battleSessionId, playerId) {
+    const teamArray = this.getAllTeams(teams);
     if (teamArray.length === 0) {
       throw new Error("No teams available to assign player to.");
     }
 
-    // Find the teams with the minimum number of players
     const minPlayerCount = Math.min(
       ...teamArray.map((team) => team.players.size)
     );
@@ -44,7 +38,6 @@ class TeamManager {
       (team) => team.players.size === minPlayerCount
     );
 
-    // Randomly select one of the available teams
     let selectedTeam;
     if (availableTeams.length === 1) {
       selectedTeam = availableTeams[0];
@@ -53,12 +46,12 @@ class TeamManager {
       const rng = new RandomGenerator(seed);
       selectedTeam = rng.getRandomElement(availableTeams);
     }
-
-    selectedTeam.players.add(playerId); // Add player to the selected team
+    selectedTeam.players.add(playerId);
+    return selectedTeam.id;
   }
 
-  removePlayerFromTeam(playerId) {
-    for (const team of this.teams.values()) {
+  removePlayerFromTeam(teams, playerId) {
+    for (const team of this.getAllTeams(teams)) {
       if (team.players.has(playerId)) {
         team.players.delete(playerId);
         return;
@@ -67,8 +60,8 @@ class TeamManager {
     throw new Error(`Player with ID ${playerId} not found in any team.`);
   }
 
-  getTeamOfPlayer(playerId) {
-    for (const team of this.teams.values()) {
+  getTeamOfPlayer(teams, playerId) {
+    for (const team of this.getAllTeams(teams)) {
       if (team.players.has(playerId)) {
         return team;
       }
@@ -76,14 +69,17 @@ class TeamManager {
     throw new Error(`Player with ID ${playerId} not found in any team.`);
   }
 
-  getTeamById(teamId) {
-    const team = this.teams.get(teamId);
+  getTeamById(teams, teamId) {
+    const team = teams.get(teamId);
     if (!team) {
       throw new Error(`Team with ID ${teamId} not found.`);
     }
     return team;
   }
+
+  getTeamNameById(teams, teamId) {
+    return this.getTeamById(teams, teamId).name;
+  }
 }
 
-const teamManager = new TeamManager();
-export default teamManager;
+export default TeamManager;

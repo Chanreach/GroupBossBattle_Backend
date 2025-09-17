@@ -9,7 +9,7 @@ import {
 class QuestionService {
   static async getQuestionsByEventBossId(eventBossId) {
     try {
-      const eventBoss = EventBoss.findByPk(eventBossId, {
+      const eventBoss = await EventBoss.findByPk(eventBossId, {
         include: [
           {
             model: Boss,
@@ -22,10 +22,12 @@ class QuestionService {
                   {
                     model: Question,
                     as: "questions",
+                    attributes: { exclude: ["createdAt", "updatedAt"] },
                     include: [
                       {
                         model: AnswerChoice,
-                        as: "answerChoices"
+                        as: "answerChoices",
+                        attributes: { exclude: ["createdAt", "updatedAt"] }
                       }
                     ]
                   }
@@ -42,10 +44,10 @@ class QuestionService {
       const questions = eventBoss.boss.Categories.flatMap(category => 
         category.questions.map(question => ({
           ...question.toJSON(),
-          categoryId: category.id
+          categoryId: category.id,
+          categoryName: category.name,
         }))
       );
-
       return questions;
     } catch (error) {
       console.error("Error fetching questions by event boss ID:", error);

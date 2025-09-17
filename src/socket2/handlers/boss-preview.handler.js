@@ -4,7 +4,7 @@ import {
   SOCKET_ERRORS,
   SOCKET_MESSAGES,
 } from "../../utils/socket.constants.js";
-import BossService from "../../services/boss.service.js";
+import EventBossService from "../../services/event-boss.service.js";
 
 const handleBossPreview = (io, socket) => {
   socket.on(SOCKET_EVENTS.BOSS_PREVIEW.JOIN, async (payload) => {
@@ -18,7 +18,8 @@ const handleBossPreview = (io, socket) => {
     }
 
     try {
-      const eventBoss = await BossService.getEventBossByIdAndJoinCode(eventBossId, joinCode);
+      const response = await EventBossService.getEventBossById(eventBossId);
+      const eventBoss = response.eventBoss;
       if (!eventBoss) {
         socket.emit(SOCKET_EVENTS.ERROR, {
           error: SOCKET_ERRORS.NOT_FOUND,
@@ -33,8 +34,8 @@ const handleBossPreview = (io, socket) => {
         status: "success",
         message: "Successfully joined boss preview.",
         data: {
-          eventBoss
-        }
+          eventBoss,
+        },
       });
     } catch (error) {
       socket.emit(SOCKET_EVENTS.ERROR, {
@@ -60,19 +61,6 @@ const handleBossPreview = (io, socket) => {
       message: "Successfully left boss preview.",
     });
   });
-
-  socket.on(SOCKET_EVENTS.BOSS.REQUEST_STATUS, (eventBossId) => {
-    if (!eventBossId) {
-      socket.emit(SOCKET_EVENTS.ERROR, {
-        error: SOCKET_ERRORS.MISSING_DATA,
-        message: SOCKET_MESSAGES.INVALID_JOIN,
-      });
-      return;
-    }
-
-    // Handle boss status request
-  });
-
 };
 
 export default handleBossPreview;

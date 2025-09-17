@@ -1,7 +1,6 @@
-import { MILESTONE_THRESHOLDS } from "./badge-system";
-
-// ===== GAME CONSTANTS ===== //
 export const GAME_CONSTANTS = {
+  BATTLE_COUNTDOWN: 5000,
+
   MINIMUM_HP_THRESHOLD: 30,
   HP_SCALING_PER_PLAYER: 15,
   TEAM_SCALING_FACTOR: 0.2,
@@ -45,9 +44,21 @@ export const GAME_CONSTANTS = {
 
     BATTLE_STATE: {
       ACTIVE: "active",
-      KNOCKOUT: "knockout",
+      KNOCKED_OUT: "knocked-out",
       DEAD: "dead",
     }
+  },
+
+  BATTLE_STATE: {
+    ACTIVE: "active",
+    IN_PROGRESS: "in-progress",
+    ENDED: "ended",
+  },
+
+  REVIVAL_CODE: {
+    LENGTH: 6,
+    EXPIRED: "expired",
+    INVALID: "invalid",
   },
 
   BADGE: {

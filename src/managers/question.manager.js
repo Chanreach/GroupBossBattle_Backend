@@ -4,30 +4,19 @@ import { generateSeed } from "../utils/generate-seed.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
 
 class QuestionManager {
-  constructor() {
-    this.questionBanks = [];
-    this.questionPools = new Map();
-  }
-
-  async initializeQuestionBank(eventBossId) {
-    try {
-      const questions = await QuestionService.getQuestionsByEventBossId(
-        eventBossId
-      );
-      this.questionBanks = questions;
-
-      if (this.questionBanks.length === 0) {
-        throw new Error("No questions found for the specified event boss.");
-      }
-    } catch (error) {
-      console.error("Error initializing question bank:", error);
-      throw error;
+  async initializeQuestionBank(questionBank, eventBossId) {
+    const questions = await QuestionService.getQuestionsByEventBossId(
+      eventBossId
+    );
+    if (!questions || questions.length === 0) {
+      return null;
     }
+    questionBank.push(...questions);
   }
 
-  prepareQuestionPoolForPlayer(battleSessionId, playerId) {
-    if (!this.questionPools.has(playerId)) {
-      this.questionPools.set(playerId, {
+  prepareQuestionPoolForPlayer(questions, battleSessionId, playerId) {
+    if (!questions.pools.has(playerId)) {
+      questions.pools.set(playerId, {
         questions: [],
         currentIndex: 0,
         loopCount: 0,
@@ -36,27 +25,26 @@ class QuestionManager {
 
     const seed = generateSeed([battleSessionId, playerId, "question_pool"]);
     const processedQuestions = this.prepareQuestionsForPlayer(
+      questions.bank,
       battleSessionId,
       playerId,
       seed
     );
 
-    this.questionPools.set(playerId, {
+    questions.pools.set(playerId, {
       questions: processedQuestions,
       currentIndex: 0,
       loopCount: 0,
     });
   }
 
-  prepareQuestionsForPlayer(battleSessionId, playerId, seed) {
-    const questions = this.questionBanks;
-
-    if (!questions || questions.length === 0) {
+  prepareQuestionsForPlayer(questionBank, battleSessionId, playerId, seed) {
+    if (!questionBank || questionBank.length === 0) {
       throw new Error("No questions available in the question bank.");
     }
 
     const questionRng = new RandomGenerator(seed);
-    const shuffledQuestions = questionRng.shuffleArray(questions);
+    const shuffledQuestions = questionRng.shuffleArray(questionBank);
 
     const processedQuestions = shuffledQuestions.map(
       (question, questionIndex) => {
@@ -81,11 +69,9 @@ class QuestionManager {
       questionIndex,
       "answer_choices",
     ]);
-    
-    const { formattedAnswerChoices, correctAnswerIndex } = this.shuffleAnswerChoices(
-      allAnswerChoices,
-      seed
-    );
+
+    const { formattedAnswerChoices, correctAnswerIndex } =
+      this.shuffleAnswerChoices(allAnswerChoices, seed);
 
     return {
       id: question.id,
@@ -99,12 +85,12 @@ class QuestionManager {
     };
   }
 
-  getNextQuestion(battleSessionId, playerId) {
-    if (!this.questionPools.has(playerId)) {
+  getNextQuestion(questions, battleSessionId, playerId) {
+    if (!questions.pools.has(playerId)) {
       throw new Error(`No question pool found for player ${playerId}`);
     }
 
-    const questionPool = this.questionPools.get(playerId);
+    const questionPool = questions.pools.get(playerId);
     if (!questionPool || questionPool.questions.length === 0) {
       throw new Error(`No questions available for player ${playerId}`);
     }
@@ -120,6 +106,7 @@ class QuestionManager {
         questionPool.loopCount,
       ]);
       questionPool.questions = this.prepareQuestionsForPlayer(
+        questions.bank,
         battleSessionId,
         playerId,
         seed
@@ -128,6 +115,7 @@ class QuestionManager {
 
     const question = questionPool.questions[questionPool.currentIndex];
     questionPool.currentIndex += 1;
+    question.startTime = Date.now();
 
     return {
       id: question.id,
@@ -139,7 +127,7 @@ class QuestionManager {
         text: choice.text,
         index: choice.index,
       })),
-      deliveredAt: Date.now()
+      startTime: question.startTime,
     };
   }
 
@@ -168,7 +156,7 @@ class QuestionManager {
     const formattedAnswerChoices = shuffledAnswerChoices.map(
       (choice, index) => ({
         id: choice.id,
-        text: choice.text,
+        text: choice.choiceText,
         isCorrect: choice.isCorrect,
         index,
       })
@@ -176,23 +164,22 @@ class QuestionManager {
 
     return {
       formattedAnswerChoices,
-      correctAnswerIndex
-    }
+      correctAnswerIndex,
+    };
   }
 
-  validatePlayerAnswer(playerId, choiceIndex) {
-    const questionPool = this.questionPools.get(playerId);
+  getCurrentQuestion(questionPool) {
     if (!questionPool || questionPool.questions.length === 0) {
-      throw new Error(`No questions available for player ${playerId}`);
+      throw new Error("No questions available");
     }
+    return questionPool.questions[questionPool.currentIndex - 1];
+  }
 
-    const currentQuestion = questionPool.questions[questionPool.currentIndex - 1];
-    if (!currentQuestion) {
-      throw new Error(`No current question found for player ${playerId}`);
+  validatePlayerAnswer(question, choiceIndex) {
+    if (!question) {
+      throw new Error("No question provided");
     }
-
-    const isCorrect = currentQuestion.correctAnswerIndex === choiceIndex;
-    return isCorrect;
+    return question.correctAnswerIndex === choiceIndex;
   }
 
   clearQuestionPool() {
@@ -200,10 +187,7 @@ class QuestionManager {
     this.questionPools.clear();
   }
 
-  validateQuestionStructure(question) {
-    
-  }
+  validateQuestionStructure(question) {}
 }
 
-const questionManager = new QuestionManager();
-export default questionManager;
+export default QuestionManager;

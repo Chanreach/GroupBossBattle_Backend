@@ -120,5 +120,4 @@ class BadgeManager {
   }
 }
 
-const badgeManager = new BadgeManager();
-export default badgeManager;
+export default BadgeManager;

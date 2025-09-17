@@ -1,4 +1,4 @@
-import { GAME_CONSTANTS } from "./game.constants";
+import { GAME_CONSTANTS } from "./game.constants.js";
 import RandomGenerator from "./random-generator.js";
 import { generateSeed } from "./generate-seed.js";
 
@@ -58,18 +58,23 @@ export const getDamageMultiplier = (responseTime, questionTimeLimit) => {
 
 export const calculateDamage = (isCorrect, responseTime, questionTimeLimit) => {
   if (!isCorrect) {
-    return 0;
+    return {
+      damage: 0,
+      responseCategory: "INCORRECT",
+    };
   }
 
-  return (
-    GAME_CONSTANTS.BASE_DAMAGE *
-    getDamageMultiplier(responseTime, questionTimeLimit)
-  );
+  return {
+    damage:
+      GAME_CONSTANTS.BASE_DAMAGE *
+      getDamageMultiplier(responseTime, questionTimeLimit),
+    responseCategory: getResponseTimeCategory(responseTime, questionTimeLimit),
+  };
 };
 
 export const generateRevivalCode = (battleSessionId, playerId, length = 6) => {
   const seed = generateSeed([battleSessionId, playerId, new Date()]);
-  const rng = RandomGenerator(seed);
+  const rng = new RandomGenerator(seed);
 
   const characters = "ABCDEFGHJKLMNPQRSTUVWXYZ123456789";
   let result = "";
@@ -98,4 +103,11 @@ export const generateUniqueRevivalCode = (
   }
 
   throw new Error("Unable to generate a unique revival code");
+};
+
+export const generateBattleSessionId = (eventBossId) => {
+  const timestamp = Date.now();
+  const rng = new RandomGenerator();
+  const randomSuffix = rng.getRandomInt(0, 9999).toString().padStart(4, "0");
+  return `${eventBossId}-${timestamp}-${randomSuffix}`;
 };

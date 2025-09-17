@@ -1,5 +1,5 @@
 import { Op, fn, col } from "sequelize";
-import { Event, Badge, UserBadge, sequelize } from "../models/index.js";
+import { Event, Badge, UserBadge } from "../models/index.js";
 
 class BadgeService {
   static async initializeBadges() {
@@ -136,7 +136,13 @@ class BadgeService {
     }
   }
 
-  static async awardBadge(playerId, badgeId, eventBossId = null, eventId, badgeType) {
+  static async awardBadge(
+    playerId,
+    badgeId,
+    eventBossId = null,
+    eventId,
+    badgeType
+  ) {
     try {
       const badge = await Badge.findByPk(badgeId);
       if (!badge) {

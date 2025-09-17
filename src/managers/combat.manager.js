@@ -2,67 +2,39 @@ import { GAME_CONSTANTS } from "../utils/game.constants.js";
 import {
   initializePlayerStats,
   initializeTeamStats,
-  calculateBossHP,
   calculateDamage,
 } from "../utils/game.utils.js";
 
 class CombatManager {
-  constructor() {
-    this.combatStates = new Map();
+  initializeTeamStats(combatState, teamId) {
+    if (combatState.teamStats.has(teamId)) {
+      return;
+    }
+    combatState.teamStats.set(teamId, initializeTeamStats());
   }
 
-  initializeCombat(battleSessionData, numberOfPlayers) {
-    const combatState = {
-      battleSessionId: battleSessionData.id,
-      eventBoss: {
-        id: battleSessionData.eventBoss.id,
-        name: battleSessionData.eventBoss.name,
-        maxHP: calculateBossHP(
-          numberOfPlayers,
-          battleSessionData.eventBoss.numberOfTeams
-        ),
-        currentHP: 0,
-      },
-      playerStats: new Map(),
-      teamStats: new Map(),
-    };
-
-    combatState.eventBoss.currentHP = combatState.eventBoss.maxHP;
-
-    for (const team of battleSessionData.teams) {
-      combatState.teamStats.set(team.id, initializeTeamStats());
+  initializePlayerStats(combatState, playerId) {
+    if (combatState.playerStats.has(playerId)) {
+      return;
     }
-
-    for (const player of battleSessionData.players) {
-      combatState.playerStats.set(player.id, initializePlayerStats());
-    }
-
-    this.combatStates.set(battleSessionData.id, combatState);
-  }
-
-  updateBossHP(battleSessionId, numberOfPlayers, numberOfTeams) {
-    const combatState = this.getCombatState(battleSessionId);
-    const newMaxHP = calculateBossHP(numberOfPlayers, numberOfTeams);
-    if (newMaxHP > combatState.maxHP) {
-      combatState.maxHP = newMaxHP;
-      combatState.currentHP += newMaxHP - combatState.maxHP;
-    }
+    combatState.playerStats.set(playerId, initializePlayerStats());
   }
 
   processPlayerAttack(
-    battleSessionId,
+    combatState,
+    eventBoss,
     playerId,
     teamId,
     isCorrect,
     responseTime,
     questionTimeLimit
   ) {
-    const playerStats = this.getPlayerStats(battleSessionId, playerId);
-    const teamStats = this.getTeamStats(battleSessionId, teamId);
-    const damage = calculateDamage(isCorrect, responseTime, questionTimeLimit);
+    const playerStats = this.getPlayerStats(combatState, playerId);
+    const teamStats = this.getTeamStats(combatState, teamId);
+    const { damage, responseCategory } = calculateDamage(isCorrect, responseTime, questionTimeLimit);
 
     if (damage > 0) {
-      this.applyDamage(battleSessionId, damage);
+      this.applyDamage(eventBoss, damage);
       playerStats.totalDamage += damage;
       teamStats.totalDamage += damage;
     }
@@ -73,73 +45,87 @@ class CombatManager {
     } else {
       playerStats.incorrectAnswers += 1;
       teamStats.incorrectAnswers += 1;
-      this.deductPlayerHearts(battleSessionId, playerId);
+      this.deductPlayerHearts(combatState, playerId);
     }
 
     playerStats.questionsAnswered += 1;
     teamStats.questionsAnswered += 1;
+
+    return {
+      isCorrect,
+      damage,
+      responseCategory,
+      playerHearts: playerStats.hearts,
+      eventBossCurrentHP: eventBoss.currentHP,
+    };
   }
 
-  applyDamage(battleSessionId, damage) {
-    const combatState = this.getCombatState(battleSessionId);
-    combatState.eventBoss.currentHP = Math.max(
-      0,
-      combatState.eventBoss.currentHP - damage
-    );
-    return combatState.eventBoss.currentHP;
+  processQuestionTimeout(combatState, eventBoss, playerId, teamId) {
+    const playerStats = this.getPlayerStats(combatState, playerId);
+    const teamStats = this.getTeamStats(combatState, teamId);
+
+    playerStats.incorrectAnswers += 1;
+    teamStats.incorrectAnswers += 1;
+
+    playerStats.questionsAnswered += 1;
+    teamStats.questionsAnswered += 1;
+
+    this.deductPlayerHearts(combatState, playerId);
+
+    return {
+      isCorrect: false,
+      damage: 0,
+      responseCategory: "TIMEOUT",
+      playerHearts: playerStats.hearts,
+      eventBossCurrentHP: eventBoss.currentHP,
+    }
   }
 
-  deductPlayerHearts(battleSessionId, playerId) {
-    const playerStats = this.getPlayerStats(battleSessionId, playerId);
+  applyDamage(eventBoss, damage) {
+    eventBoss.currentHP = Math.max(0, eventBoss.currentHP - damage);
+    return eventBoss.currentHP;
+  }
+
+  deductPlayerHearts(combatState, playerId) {
+    const playerStats = this.getPlayerStats(combatState, playerId);
     playerStats.hearts = Math.max(0, playerStats.hearts - 1);
     return playerStats.hearts;
   }
 
-  getCombatState(battleSessionId) {
-    if (!this.combatStates.has(battleSessionId)) {
+  getCombatState(battleSession) {
+    if (!battleSession.combat) {
       throw new Error("Combat session not found");
     }
-    return this.combatStates.get(battleSessionId);
+    return battleSession.combat;
   }
 
-  getPlayerStats(battleSessionId, playerId) {
-    const combatState = this.getCombatState(battleSessionId);
+  getPlayerStats(combatState, playerId) {
     if (!combatState.playerStats.has(playerId)) {
       throw new Error(`Player with ID ${playerId} not found in combat session`);
     }
     return combatState.playerStats.get(playerId);
   }
 
-  getTeamStats(battleSessionId, teamId) {
-    const combatState = this.getCombatState(battleSessionId);
+  getTeamStats(combatState, teamId) {
     if (!combatState.teamStats.has(teamId)) {
       throw new Error(`Team with ID ${teamId} not found in combat session`);
     }
     return combatState.teamStats.get(teamId);
   }
 
-  isBossDefeated(battleSessionId) {
-    const combatState = this.getCombatState(battleSessionId);
-    return combatState.eventBoss.currentHP <= 0;
-  }
-
-  getPlayerHearts(battleSessionId, playerId) {
-    const playerStats = this.getPlayerStats(battleSessionId, playerId);
+  getPlayerHearts(combatState, playerId) {
+    const playerStats = this.getPlayerStats(combatState, playerId);
     return playerStats.hearts;
   }
 
-  restorePlayerHearts(battleSessionId, playerId) {
-    const playerStats = this.getPlayerStats(battleSessionId, playerId);
+  restorePlayerHearts(combatState, playerId) {
+    const playerStats = this.getPlayerStats(combatState, playerId);
     playerStats.hearts = GAME_CONSTANTS.PLAYER_STARTING_HEARTS;
   }
 
-  resetPlayerStats(battleSessionId, playerId) {
-    const playerStats = this.getPlayerStats(battleSessionId, playerId);
+  resetPlayerStats(combatState, playerId) {
+    const playerStats = this.getPlayerStats(combatState, playerId);
     Object.assign(playerStats, initializePlayerStats());
-  }
-
-  resetCombat(battleSessionId) {
-    this.combatStates.delete(battleSessionId);
   }
 }
 
