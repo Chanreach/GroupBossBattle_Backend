@@ -4,14 +4,6 @@ class LeaderboardManager {
   constructor() {
     this.teamLeaderboards = new Map();
     this.individualLeaderboards = new Map();
-    this.allTimeLeaderboards = new Map();
-  }
-
-  async initializeAllTimeLeaderboard() {
-    const allTimeData = await LeaderboardService.getAllTimeLeaderboard();
-    allTimeData.forEach((entry) => {
-      this.allTimeLeaderboards.set(entry.playerId, entry);
-    });
   }
 
   initializeTeamLeaderboard(eventBossId, teams) {
@@ -88,28 +80,28 @@ class LeaderboardManager {
     }));
   }
 
-  getComprehensiveLiveLeaderboard(eventBossId) {
+  async getComprehensiveLiveLeaderboard(eventBossId) {
     const teamLeaderboard = this.getTeamLeaderboard(eventBossId)
       ? this.sortLeaderboardByRank(this.getTeamLeaderboard(eventBossId))
       : null;
     const individualLeaderboard = this.getIndividualLeaderboard(eventBossId)
       ? this.sortLeaderboardByRank(this.getIndividualLeaderboard(eventBossId))
       : null;
+    const allTimeLeaderboard = await this.getEventBossAllTimeLeaderboard(eventBossId);
     return {
       teamLeaderboard,
       individualLeaderboard,
+      allTimeLeaderboard,
     };
   }
 
   updateLiveLeaderboard(eventBossId, playerId, data) {
-    console.log("data", data);
     const player = this.getPlayerById(eventBossId, playerId);
     player.totalDamage += data.totalDamage;
     player.correctAnswers += data.correctAnswers;
     player.incorrectAnswers += data.incorrectAnswers;
     player.questionsAnswered += data.questionsAnswered;
     player.accuracy = player.correctAnswers / player.questionsAnswered || 0;
-    console.log("player", player);
 
     const team = this.getTeamById(eventBossId, player.teamId);
     team.totalDamage += data.totalDamage;
@@ -119,15 +111,48 @@ class LeaderboardManager {
     team.accuracy = team.correctAnswers / team.questionsAnswered || 0;
   }
 
-  async finalizeAllTimeLeaderboard(eventBossId) {
-    const allTimeLeaderboardData =
-      await LeaderboardService.getAllTimeLeaderboard(eventBossId);
+  async getPlayerStatsByEventId(playerId, eventId) {
+    return await LeaderboardService.getPlayerStatsByEventId(playerId, eventId);
+  }
 
-    this.resetAllTimeLeaderboard(eventBossId);
-    const allTimeLeaderboard = this.getAllTimeLeaderboard(eventBossId);
-    allTimeLeaderboardData.forEach((entry) => {
-      allTimeLeaderboard.set(entry.playerId, entry);
+  async getEventBossAllTimeLeaderboard(eventBossId) {
+    const leaderboard = await LeaderboardService.getEventBossAllTimeLeaderboard(
+      eventBossId
+    );
+    if (!leaderboard) {
+      return null;
+    }
+
+    const eventBossAllTimeLeaderboard = new Map();
+    leaderboard.forEach((entry) => {
+      eventBossAllTimeLeaderboard.set(entry.playerId, entry);
     });
+    return this.sortLeaderboardByRank(
+      this.rankLeaderboard(eventBossAllTimeLeaderboard)
+    );
+  }
+
+  async getEventAllTimeLeaderboard(eventId) {
+    const leaderboard = await LeaderboardService.getEventAllTimeLeaderboard(
+      eventId
+    );
+    const eventAllTimeLeaderboard = new Map();
+    leaderboard.forEach((entry) => {
+      eventAllTimeLeaderboard.set(entry.playerId, entry);
+    });
+    return this.sortLeaderboardByRank(
+      this.rankLeaderboard(eventAllTimeLeaderboard)
+    );
+  }
+
+  async updateEventBossAllTimeLeaderboard(playerId, eventBossId, data) {
+    return await LeaderboardService.updateLeaderboardEntry(
+      playerId,
+      eventBossId,
+      data.totalDamage,
+      data.correctAnswers,
+      data.questionsAnswered
+    );
   }
 
   getTeamLeaderboard(eventBossId) {
@@ -144,16 +169,6 @@ class LeaderboardManager {
     }
     const individualLeaderboard = this.individualLeaderboards.get(eventBossId);
     return this.rankLeaderboard(individualLeaderboard);
-  }
-
-  getAllTimeLeaderboard(eventBossId) {
-    if (!this.allTimeLeaderboards.has(eventBossId)) {
-      throw new Error(
-        `All-time leaderboard for event boss ${eventBossId} not found`
-      );
-    }
-    const allTimeLeaderboard = this.allTimeLeaderboards.get(eventBossId);
-    return this.rankLeaderboard(allTimeLeaderboard);
   }
 
   rankLeaderboard(leaderboard) {
@@ -222,11 +237,6 @@ class LeaderboardManager {
   resetIndividualLeaderboard(eventBossId) {
     const individualLeaderboard = this.getIndividualLeaderboard(eventBossId);
     individualLeaderboard.clear();
-  }
-
-  resetAllTimeLeaderboard(eventBossId) {
-    const allTimeLeaderboard = this.getAllTimeLeaderboard(eventBossId);
-    allTimeLeaderboard.clear();
   }
 }
 

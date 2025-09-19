@@ -7,7 +7,7 @@ import {
 import battleSessionManager from "../../managers/battle-session.manager.js";
 
 const handleLeaderboard = (io, socket) => {
-  socket.on(SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.REQUEST, (payload) => {
+  socket.on(SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.REQUEST, async (payload) => {
     const { eventBossId } = payload;
     if (!eventBossId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
@@ -17,8 +17,10 @@ const handleLeaderboard = (io, socket) => {
     }
 
     try {
-      const leaderboard =
-        battleSessionManager.getPreviewLiveLeaderboard(eventBossId);
+      const leaderboard = await battleSessionManager.getPreviewLiveLeaderboard(
+        eventBossId
+      );
+      console.log(leaderboard.allTimeLeaderboard);
       socket.emit(SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.RESPONSE, {
         data: { leaderboard },
       });
@@ -39,7 +41,7 @@ const handleLeaderboard = (io, socket) => {
       });
       return;
     }
-    
+
     try {
       const leaderboard =
         battleSessionManager.getBattleLiveLeaderboard(eventBossId);

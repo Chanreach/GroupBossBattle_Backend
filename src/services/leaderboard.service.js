@@ -2,149 +2,168 @@ import {
   Leaderboard,
   User,
   EventBoss,
-  Event,
-  Boss,
   PlayerSession,
 } from "../models/index.js";
-import { Op } from "sequelize";
+import { Op, fn, col, literal } from "sequelize";
 
 class LeaderboardService {
-  static async updatePlayerLeaderboard(
+  static async updateLeaderboardEntry(
     playerId,
     eventBossId,
-    totalDamage,
-    correctAnswers
+    totalDamage = 0,
+    correctAnswers = 0,
+    questionsAnswered = 0
   ) {
     try {
       const [leaderboardEntry, created] = await Leaderboard.findOrCreate({
         where: {
-          playerId: playerId,
-          eventBossId: eventBossId,
+          playerId,
+          eventBossId,
         },
         defaults: {
-          totalDamageDealt: totalDamage || 0,
-          totalCorrectAnswers: correctAnswers || 0,
+          totalDamageDealt: totalDamage,
+          totalCorrectAnswers: correctAnswers,
+          totalQuestionsAnswered: questionsAnswered,
+          totalBattlesParticipated: 1,
         },
       });
 
       if (!created) {
-        // Update existing entry with new totals (not incremental)
-        await leaderboardEntry.update({
-          totalDamageDealt: totalDamage || 0,
-          totalCorrectAnswers: correctAnswers || 0,
+        await leaderboardEntry.increment("totalDamageDealt", {
+          by: totalDamage,
         });
+        await leaderboardEntry.increment("totalCorrectAnswers", {
+          by: correctAnswers,
+        });
+        await leaderboardEntry.increment("totalQuestionsAnswered", {
+          by: questionsAnswered,
+        });
+        await leaderboardEntry.increment("totalBattlesParticipated", { by: 1 });
       }
 
       return leaderboardEntry;
     } catch (error) {
-      console.error("Error updating player leaderboard:", error);
+      console.error("Error creating leaderboard entry:", error);
       throw error;
     }
   }
 
-  static async getEventOverallLeaderboard(eventId, limit = 50) {
+  static async getPlayerStatsByEventBossId(playerId, eventBossId) {
     try {
-      // First get all eventBoss IDs for this event
+      const leaderboardEntry = await Leaderboard.findOne({
+        where: {
+          playerId,
+          eventBossId,
+        },
+      });
+      return leaderboardEntry;
+    } catch (error) {
+      console.error("Error fetching player stats:", error);
+      throw error;
+    }
+  }
+
+  static async getPlayerStatsByEventId(playerId, eventId) {
+    try {
       const eventBosses = await EventBoss.findAll({
-        where: { eventId: eventId },
+        where: { eventId },
         attributes: ["id"],
       });
 
       const eventBossIds = eventBosses.map((eb) => eb.id);
-
       if (eventBossIds.length === 0) {
         return [];
       }
 
-      // Get all leaderboard entries for these event bosses
-      const leaderboardEntries = await Leaderboard.findAll({
+      const leaderboardEntry = await Leaderboard.findAll({
         where: {
+          playerId,
           eventBossId: {
             [Op.in]: eventBossIds,
           },
         },
-        order: [
-          ["totalDamageDealt", "DESC"],
-          ["totalCorrectAnswers", "DESC"],
+        attributes: [
+          "playerId",
+          [fn("SUM", col("total_damage_dealt")), "totalDamageDealt"],
+          [fn("SUM", col("total_correct_answers")), "totalCorrectAnswers"],
+          [
+            fn("SUM", col("total_questions_answered")),
+            "totalQuestionsAnswered",
+          ],
+          [
+            fn("SUM", col("total_battles_participated")),
+            "totalBattlesParticipated",
+          ],
         ],
-        limit: parseInt(limit),
+        group: ["playerId"],
       });
 
-      // Enrich with player names
-      const enrichedEntries = await Promise.all(
-        leaderboardEntries.map(async (entry) => {
-          let playerName = "Unknown Player";
-          let profilePicture = null;
-
-          try {
-            const user = await User.findByPk(entry.playerId);
-            if (user) {
-              playerName = user.username;
-              profilePicture = user.profileImage;
-            } else {
-              const playerSession = await PlayerSession.findByPk(
-                entry.playerId
-              );
-              if (playerSession) {
-                playerName = playerSession.username;
-              }
-            }
-          } catch (lookupError) {
-            console.warn(
-              `Could not resolve player name for ID ${entry.playerId}`
-            );
+      return leaderboardEntry[0]
+        ? {
+            playerId: leaderboardEntry[0].playerId,
+            eventId,
+            totalDamageDealt: Number(
+              leaderboardEntry[0].get("totalDamageDealt")
+            ),
+            totalCorrectAnswers: Number(
+              leaderboardEntry[0].get("totalCorrectAnswers")
+            ),
+            totalQuestionsAnswered: Number(
+              leaderboardEntry[0].get("totalQuestionsAnswered")
+            ),
+            totalBattlesParticipated: Number(
+              leaderboardEntry[0].get("totalBattlesParticipated")
+            ),
           }
-
-          return {
-            playerId: entry.playerId,
-            playerName: playerName,
-            profilePicture: profilePicture,
-            totalDamageDealt: entry.totalDamageDealt,
-            totalCorrectAnswers: entry.totalCorrectAnswers,
-            eventBossId: entry.eventBossId,
-            createdAt: entry.createdAt,
-            updatedAt: entry.updatedAt,
-          };
-        })
-      );
-
-      return enrichedEntries;
+        : null;
     } catch (error) {
-      console.error("Error fetching event overall leaderboard:", error);
+      console.error("Error fetching player stats by event ID:", error);
       throw error;
     }
   }
 
-  static async getBossSpecificLeaderboard(eventId, eventBossId, limit = 50) {
+  static async getEventBossAllTimeLeaderboard(eventBossId) {
     try {
       const leaderboardEntries = await Leaderboard.findAll({
         where: {
-          eventBossId: eventBossId,
+          eventBossId,
         },
+        attributes: [
+          "playerId",
+          "eventBossId",
+          "totalDamageDealt",
+          "totalCorrectAnswers",
+          "totalQuestionsAnswered",
+          "totalBattlesParticipated",
+          [
+            literal(
+              "ROUND(total_correct_answers / NULLIF(total_questions_answered, 0), 4)"
+            ),
+            "accuracy",
+          ],
+        ],
         order: [
           ["totalDamageDealt", "DESC"],
-          ["totalCorrectAnswers", "DESC"],
+          ["accuracy", "DESC"],
+          ["totalBattlesParticipated", "DESC"],
         ],
-        limit: parseInt(limit),
       });
 
-      // Enrich with player names
       const enrichedEntries = await Promise.all(
         leaderboardEntries.map(async (entry) => {
-          let playerName = "Unknown Player";
-          let profilePicture = null;
-
+          let username = "Unknown Player";
+          let profileImage = null;
+          let userId = null;
           try {
-            const user = await User.findByPk(entry.playerId);
-            if (user) {
-              playerName = user.username;
-              profilePicture = user.profileImage;
-            } else {
-              const playerSession = await PlayerSession.findByPk(
-                entry.playerId
-              );
-              if (playerSession) {
-                playerName = playerSession.username;
+            const playerSession = await PlayerSession.findByPk(entry.playerId);
+            if (playerSession) {
+              username = playerSession.username;
+              userId = playerSession.userId;
+              if (userId) {
+                const user = await User.findByPk(userId);
+                if (user) {
+                  profileImage = user.profileImage;
+                }
               }
             }
           } catch (lookupError) {
@@ -152,216 +171,20 @@ class LeaderboardService {
               `Could not resolve player name for ID ${entry.playerId}`
             );
           }
-
           return {
             playerId: entry.playerId,
-            playerName: playerName,
-            profilePicture: profilePicture,
-            totalDamageDealt: entry.totalDamageDealt,
-            totalCorrectAnswers: entry.totalCorrectAnswers,
+            userId,
             eventBossId: entry.eventBossId,
-            createdAt: entry.createdAt,
-            updatedAt: entry.updatedAt,
+            playerName: username,
+            profileImage,
+            totalDamageDealt: Number(entry.totalDamageDealt),
+            totalCorrectAnswers: Number(entry.totalCorrectAnswers),
+            totalQuestionsAnswered: Number(entry.totalQuestionsAnswered),
+            totalBattlesParticipated: Number(entry.totalBattlesParticipated),
+            accuracy: Number(entry.get("accuracy")) || 0,
           };
         })
       );
-
-      return enrichedEntries;
-    } catch (error) {
-      console.error("Error fetching boss-specific leaderboard:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get all-time leaderboard (across all boss fights) - Updated for new schema
-   */
-  static async getAllTimeLeaderboard() {
-    try {
-      // Get all leaderboard entries ordered by damage and correct answers
-      const leaderboardEntries = await Leaderboard.findAll({
-        order: [
-          ["totalDamageDealt", "DESC"],
-          ["totalCorrectAnswers", "DESC"],
-        ],
-      });
-
-      // For each entry, try to resolve the player name from either User or PlayerSession
-      const enrichedEntries = await Promise.all(
-        leaderboardEntries.map(async (entry) => {
-          let playerName = "Unknown Player";
-          let profilePicture = null;
-
-          try {
-            // First try to find as a User (authenticated player)
-            const user = await User.findByPk(entry.playerId);
-            if (user) {
-              playerName = user.username;
-              profilePicture = user.profileImage;
-            } else {
-              // If not found as User, try PlayerSession (guest player)
-              const playerSession = await PlayerSession.findByPk(
-                entry.playerId
-              );
-              if (playerSession) {
-                playerName = playerSession.username;
-                // profilePicture stays null for guests
-              }
-            }
-          } catch (lookupError) {
-            console.warn(
-              `Could not resolve player name for ID ${entry.playerId}:`,
-              lookupError.message
-            );
-          }
-
-          return {
-            playerId: entry.playerId,
-            playerName: playerName,
-            profilePicture: profilePicture,
-            totalDamageDealt: entry.totalDamageDealt,
-            totalCorrectAnswers: entry.totalCorrectAnswers,
-            eventBossId: entry.eventBossId,
-            createdAt: entry.createdAt,
-            updatedAt: entry.updatedAt,
-          };
-        })
-      );
-
-      return enrichedEntries;
-    } catch (error) {
-      console.error("Error fetching all-time leaderboard:", error);
-      throw error;
-    }
-  }
-
-  static async getBossAllTimeLeaderboard(bossId, limit = 50) {
-    try {
-      // First get all eventBoss IDs for this boss
-      const eventBosses = await EventBoss.findAll({
-        where: { bossId: bossId },
-        attributes: ["id"],
-      });
-
-      const eventBossIds = eventBosses.map((eb) => eb.id);
-
-      if (eventBossIds.length === 0) {
-        return [];
-      }
-
-      // Get all leaderboard entries for these event bosses
-      const leaderboardEntries = await Leaderboard.findAll({
-        where: {
-          eventBossId: {
-            [Op.in]: eventBossIds,
-          },
-        },
-        order: [
-          ["totalDamageDealt", "DESC"],
-          ["totalCorrectAnswers", "DESC"],
-        ],
-        limit: parseInt(limit),
-      });
-
-      // Enrich with player names
-      const enrichedEntries = await Promise.all(
-        leaderboardEntries.map(async (entry) => {
-          let playerName = "Unknown Player";
-          let profilePicture = null;
-
-          try {
-            const user = await User.findByPk(entry.playerId);
-            if (user) {
-              playerName = user.username;
-              profilePicture = user.profileImage;
-            } else {
-              const playerSession = await PlayerSession.findByPk(
-                entry.playerId
-              );
-              if (playerSession) {
-                playerName = playerSession.username;
-              }
-            }
-          } catch (lookupError) {
-            console.warn(
-              `Could not resolve player name for ID ${entry.playerId}`
-            );
-          }
-
-          return {
-            playerId: entry.playerId,
-            playerName: playerName,
-            profilePicture: profilePicture,
-            totalDamageDealt: entry.totalDamageDealt,
-            totalCorrectAnswers: entry.totalCorrectAnswers,
-            eventBossId: entry.eventBossId,
-            createdAt: entry.createdAt,
-            updatedAt: entry.updatedAt,
-          };
-        })
-      );
-
-      return enrichedEntries;
-    } catch (error) {
-      console.error("Error fetching boss all-time leaderboard:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get all-time leaderboard for a specific eventBoss - Updated for new schema
-   */
-  static async getEventBossAllTimeLeaderboard(eventBossId, limit = 50) {
-    try {
-      const leaderboardEntries = await Leaderboard.findAll({
-        where: {
-          eventBossId: eventBossId,
-        },
-        order: [
-          ["totalDamageDealt", "DESC"],
-          ["totalCorrectAnswers", "DESC"],
-        ],
-        limit: parseInt(limit),
-      });
-
-      // Enrich with player names
-      const enrichedEntries = await Promise.all(
-        leaderboardEntries.map(async (entry) => {
-          let playerName = "Unknown Player";
-          let profilePicture = null;
-
-          try {
-            const user = await User.findByPk(entry.playerId);
-            if (user) {
-              playerName = user.username;
-              profilePicture = user.profileImage;
-            } else {
-              const playerSession = await PlayerSession.findByPk(
-                entry.playerId
-              );
-              if (playerSession) {
-                playerName = playerSession.username;
-              }
-            }
-          } catch (lookupError) {
-            console.warn(
-              `Could not resolve player name for ID ${entry.playerId}`
-            );
-          }
-
-          return {
-            playerId: entry.playerId,
-            playerName: playerName,
-            profilePicture: profilePicture,
-            totalDamageDealt: entry.totalDamageDealt,
-            totalCorrectAnswers: entry.totalCorrectAnswers,
-            eventBossId: entry.eventBossId,
-            createdAt: entry.createdAt,
-            updatedAt: entry.updatedAt,
-          };
-        })
-      );
-
       return enrichedEntries;
     } catch (error) {
       console.error("Error fetching event boss all-time leaderboard:", error);
@@ -369,62 +192,93 @@ class LeaderboardService {
     }
   }
 
-  /**
-   * Get player stats - Updated for new schema
-   */
-  static async getPlayerStats(playerId) {
+  static async getEventAllTimeLeaderboard(eventId) {
     try {
-      const playerEntries = await Leaderboard.findAll({
+      const eventBosses = await EventBoss.findAll({
+        where: { eventId },
+        attributes: ["id"],
+      });
+      const eventBossIds = eventBosses.map((eb) => eb.id);
+      if (eventBossIds.length === 0) {
+        return [];
+      }
+      const leaderboardEntries = await Leaderboard.findAll({
         where: {
-          playerId: playerId,
+          eventBossId: {
+            [Op.in]: eventBossIds,
+          },
         },
-        order: [["createdAt", "DESC"]],
+        attributes: [
+          "playerId",
+          [fn("SUM", col("total_damage_dealt")), "totalDamageDealt"],
+          [fn("SUM", col("total_correct_answers")), "totalCorrectAnswers"],
+          [
+            fn("SUM", col("total_questions_answered")),
+            "totalQuestionsAnswered",
+          ],
+          [
+            fn("SUM", col("total_battles_participated")),
+            "totalBattlesParticipated",
+          ],
+          [
+            fn(
+              "ROUND",
+              fn("SUM", col("total_correct_answers")) /
+                fn("NULLIF", fn("SUM", col("total_questions_answered")), 0),
+              4
+            ),
+            "accuracy",
+          ],
+        ],
+        group: ["playerId"],
+        order: [
+          ["totalDamageDealt", "DESC"],
+          ["accuracy", "DESC"],
+          ["totalBattlesParticipated", "DESC"],
+        ],
       });
 
-      const totalDamage = playerEntries.reduce(
-        (sum, entry) => sum + entry.totalDamageDealt,
-        0
+      const enrichedEntries = await Promise.all(
+        leaderboardEntries.map(async (entry) => {
+          let username = "Unknown Player";
+          let profileImage = null;
+          let userId = null;
+          try {
+            const playerSession = await PlayerSession.findByPk(entry.playerId);
+            if (playerSession) {
+              username = playerSession.username;
+              userId = playerSession.userId;
+              if (userId) {
+                const user = await User.findByPk(userId);
+                if (user) {
+                  profileImage = user.profileImage;
+                }
+              }
+            }
+          } catch (lookupError) {
+            console.warn(
+              `Could not resolve player name for ID ${entry.playerId}`
+            );
+          }
+          return {
+            playerId: entry.playerId,
+            userId,
+            eventId,
+            playerName: username,
+            profileImage,
+            totalDamageDealt: Number(entry.get("totalDamageDealt")),
+            totalCorrectAnswers: Number(entry.get("totalCorrectAnswers")),
+            totalQuestionsAnswered: Number(entry.get("totalQuestionsAnswered")),
+            totalBattlesParticipated: Number(
+              entry.get("totalBattlesParticipated")
+            ),
+            accuracy: Number(entry.get("accuracy")) || 0,
+          };
+        })
       );
-      const totalCorrectAnswers = playerEntries.reduce(
-        (sum, entry) => sum + entry.totalCorrectAnswers,
-        0
-      );
-
-      return {
-        playerId: playerId,
-        totalBattles: playerEntries.length,
-        totalDamageDealt: totalDamage,
-        totalCorrectAnswers: totalCorrectAnswers,
-        averageDamagePerBattle:
-          playerEntries.length > 0
-            ? Math.round(totalDamage / playerEntries.length)
-            : 0,
-        averageCorrectPerBattle:
-          playerEntries.length > 0
-            ? Math.round(totalCorrectAnswers / playerEntries.length)
-            : 0,
-        battles: playerEntries.map((entry) => ({
-          eventBossId: entry.eventBossId,
-          totalDamageDealt: entry.totalDamageDealt,
-          totalCorrectAnswers: entry.totalCorrectAnswers,
-          battleDate: entry.createdAt,
-        })),
-      };
+      return enrichedEntries;
     } catch (error) {
-      console.error("Error fetching player stats:", error);
-      throw error;
-    }
-  }
-
-  static async getPlayerEventRank(playerId, eventId) {
-    try {
-      const leaderboard = await this.getEventOverallLeaderboard(eventId);
-      const playerIndex = leaderboard.findIndex(
-        (entry) => entry.playerId === playerId
-      );
-      return playerIndex !== -1 ? playerIndex + 1 : null;
-    } catch (error) {
-      console.error("Error fetching player event rank:", error);
+      console.error("Error fetching event all-time leaderboard:", error);
       throw error;
     }
   }

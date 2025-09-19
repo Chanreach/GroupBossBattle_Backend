@@ -137,7 +137,7 @@ const handleBattleSession = (io, socket) => {
     }
   });
 
-  socket.on(SOCKET_EVENTS.BATTLE_SESSION.MID_GAME.JOIN, (payload) => {
+  socket.on(SOCKET_EVENTS.BATTLE_SESSION.MID_GAME.JOIN, async (payload) => {
     const { eventBossId, playerInfo } = payload;
     if (!eventBossId || !playerInfo) {
       socket.emit(SOCKET_EVENTS.ERROR, {
@@ -175,7 +175,7 @@ const handleBattleSession = (io, socket) => {
         socketId: socket.id,
         isConnected: true,
       };
-      const response = battleSessionManager.addPlayerToBattleSession(
+      const response = await battleSessionManager.addPlayerToBattleSession(
         eventBossId,
         player
       );

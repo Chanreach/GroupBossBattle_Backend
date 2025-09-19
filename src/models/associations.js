@@ -91,7 +91,7 @@ UserBadge.belongsTo(Badge, {
   onDelete: "CASCADE",
 });
 
-// UserBadge and EventBoss associations (for boss-specific badges)
+// UserBadge and EventBoss associations
 EventBoss.hasMany(UserBadge, { foreignKey: "eventBossId", as: "badges" });
 UserBadge.belongsTo(EventBoss, {
   foreignKey: "eventBossId",
@@ -99,7 +99,7 @@ UserBadge.belongsTo(EventBoss, {
   onDelete: "CASCADE",
 });
 
-// UserBadge and Event associations (for event-wide badges)
+// UserBadge and Event associations
 Event.hasMany(UserBadge, { foreignKey: "eventId", as: "badges" });
 UserBadge.belongsTo(Event, {
   foreignKey: "eventId",
@@ -107,11 +107,11 @@ UserBadge.belongsTo(Event, {
   onDelete: "CASCADE",
 });
 
-// **LEADERBOARD ASSOCIATIONS**
-// Note: playerId can be either User.id (for authenticated users) or PlayerSession.id (for guests)
-// These associations are optional since we handle mixed ID types
+// PlayerSession and UserBadge associations
+PlayerSession.hasMany(UserBadge, { foreignKey: "playerId", as: "badges" });
+UserBadge.belongsTo(PlayerSession, { foreignKey: "playerId", as: "playerSession" });
 
-// Leaderboard to EventBoss (required association)
+// Leaderboard and EventBoss associations
 EventBoss.hasMany(Leaderboard, {
   foreignKey: "eventBossId",
   as: "leaderboardEntries",
@@ -121,28 +121,14 @@ Leaderboard.belongsTo(EventBoss, {
   as: "eventBoss",
 });
 
-// Optional associations for when playerId is a User.id
-User.hasMany(Leaderboard, {
-  foreignKey: "playerId",
-  as: "leaderboardEntries",
-  constraints: false,
-});
-Leaderboard.belongsTo(User, {
-  foreignKey: "playerId",
-  as: "user",
-  constraints: false,
-});
-
-// Optional associations for when playerId is a PlayerSession.id
+// PlayerSession and Leaderboard associations
 PlayerSession.hasMany(Leaderboard, {
   foreignKey: "playerId",
   as: "leaderboardEntries",
-  constraints: false,
 });
 Leaderboard.belongsTo(PlayerSession, {
   foreignKey: "playerId",
   as: "playerSession",
-  constraints: false,
 });
 
 export {

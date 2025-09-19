@@ -14,21 +14,41 @@ class BadgeManager {
   }
 
   async initializePlayerBadges(playerId) {
-    if (!this.playerBadges.has(playerId)) {
-      this.playerBadges.set(playerId, []);
+    if (this.playerBadges.has(playerId)) {
+      return;
     }
 
+    this.playerBadges.set(playerId, []);
     const playerBadges = await BadgeService.getAllPlayerBadges(playerId);
     playerBadges.forEach((badge) => {
       this.playerBadges.get(playerId).push(badge);
     });
   }
 
+  checkMilestoneEligibility(playerId, eventId, totalCorrectAnswers) {
+    const milestones = this.getSortedMilestoneBadges();
+    const playerBadges = this.getPlayerBadges(playerId);
+    console.log("Player badges:", playerBadges);
+
+    for (const milestone of milestones) {
+      if (this.hasEarnedMilestoneBadge(playerBadges, eventId, milestone.code)) {
+        continue;
+      }
+      if (totalCorrectAnswers >= milestone.threshold) {
+        return milestone.code;
+      }
+    }
+    return null;
+  }
+
   async awardBadge(playerId, eventBossId, eventId, badgeCode) {
     const playerBadges = this.getPlayerBadges(playerId);
     const badge = this.getBadgeByCode(badgeCode);
 
-    if (badge.type === "milestone" && this.hasEarnedMilestoneBadge(playerBadges, eventId, badge.code)) {
+    if (
+      badge.type === "milestone" &&
+      this.hasEarnedMilestoneBadge(playerBadges, eventId, badge.code)
+    ) {
       throw new Error("Player has already earned this milestone badge.");
     }
 
@@ -41,35 +61,20 @@ class BadgeManager {
     );
 
     if (badgeData) {
-      if (
-        this.hasEarnedAchievementBadge(
-          playerBadges,
-          eventId,
-          eventBossId,
-          badge.code
-        )
-      ) {
-        const existingBadge = this.getPlayerBadge(
-          playerId,
-          eventId,
-          eventBossId,
-          badge.code
-        );
-
-        if (existingBadge) {
-          existingBadge.earnCount++;
-          existingBadge.lastEarnedAt = badgeData.lastEarnedAt;
-        }
+      const existingPlayerBadge = playerBadges.find(
+        (badge) =>
+          badge.eventId === badgeData.eventId &&
+          badge.eventBossId === badgeData.eventBossId &&
+          badge.badgeCode === badgeData.badgeCode
+      );
+      if (existingPlayerBadge) {
+        existingPlayerBadge.earnCount = badgeData.earnCount;
+        existingPlayerBadge.lastEarnedAt = badgeData.lastEarnedAt;
       } else {
-        playerBadges.push({
-          badgeId: badgeData.badgeId,
-          badgeCode: badgeData.badgeCode,
-          eventBossId: badgeData.eventBossId,
-          eventId: badgeData.eventId,
-          earnCount: 1,
-          lastEarnedAt: badgeData.lastEarnedAt,
-        });
+        playerBadges.push(badgeData);
       }
+    } else {
+      throw new Error("Failed to award badge.");
     }
 
     return badgeData;
@@ -95,6 +100,22 @@ class BadgeManager {
     );
   }
 
+  getAllBadges() {
+    return Array.from(this.badges.values());
+  }
+
+  getAllMilestoneBadges() {
+    return Array.from(this.badges.values()).filter(
+      (badge) => badge.type === "milestone"
+    );
+  }
+
+  getSortedMilestoneBadges() {
+    return this.getAllMilestoneBadges().sort(
+      (a, b) => a.threshold - b.threshold
+    );
+  }
+
   getPlayerBadge(playerId, eventId, eventBossId, badgeCode) {
     const playerBadges = this.getPlayerBadges(playerId);
     return playerBadges.find(
@@ -114,10 +135,12 @@ class BadgeManager {
 
   getPlayerBadges(playerId) {
     if (!this.playerBadges.has(playerId)) {
-      this.playerBadges.set(playerId, []);
+      throw new Error(`Player with ID ${playerId} not found.`);
     }
     return this.playerBadges.get(playerId);
   }
 }
 
-export default BadgeManager;
+const badgeManager = new BadgeManager();
+await badgeManager.initializeBadges();
+export default badgeManager;

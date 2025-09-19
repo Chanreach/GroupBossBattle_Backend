@@ -23,6 +23,7 @@ class CombatManager {
   processPlayerAttack(
     combatState,
     eventBoss,
+    achievementAwards,
     playerId,
     teamId,
     isCorrect,
@@ -31,12 +32,20 @@ class CombatManager {
   ) {
     const playerStats = this.getPlayerStats(combatState, playerId);
     const teamStats = this.getTeamStats(combatState, teamId);
-    const { damage, responseCategory } = calculateDamage(isCorrect, responseTime, questionTimeLimit);
+    const { damage, responseCategory } = calculateDamage(
+      isCorrect,
+      responseTime,
+      questionTimeLimit
+    );
 
     if (damage > 0) {
       this.applyDamage(eventBoss, damage);
       playerStats.totalDamage += damage;
       teamStats.totalDamage += damage;
+
+      if (eventBoss.currentHP <= 0) {
+        achievementAwards.lastHit = playerId;
+      }
     }
 
     if (isCorrect) {
@@ -78,7 +87,7 @@ class CombatManager {
       responseCategory: "TIMEOUT",
       playerHearts: playerStats.hearts,
       eventBossCurrentHP: eventBoss.currentHP,
-    }
+    };
   }
 
   applyDamage(eventBoss, damage) {

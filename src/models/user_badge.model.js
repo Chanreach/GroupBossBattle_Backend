@@ -12,24 +12,25 @@ const UserBadge = sequelize.define(
     playerId: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: "player_id",
     },
     badgeId: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: "badge_id",
     },
     eventBossId: {
       type: DataTypes.UUID,
       allowNull: true,
-      field: "event_boss_id",
     },
     eventId: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: "event_id",
     },
-    earnedAt: {
+    earnCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
+    lastEarnedAt: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
@@ -39,20 +40,6 @@ const UserBadge = sequelize.define(
     tableName: "user_badges",
     timestamps: true,
     underscored: true,
-    indexes: [
-      {
-        fields: ["player_id"],
-      },
-      {
-        fields: ["badge_id"],
-      },
-      {
-        fields: ["event_boss_id"],
-      },
-      {
-        fields: ["event_id"],
-      },
-    ],
   }
 );
 

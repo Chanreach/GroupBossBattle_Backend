@@ -40,7 +40,7 @@ class MatchmakingManager {
               console.error("Player not found.");
               return;
             }
-            battleSessionManager.addPlayerToBattleSession(
+            await battleSessionManager.addPlayerToBattleSession(
               eventBossId,
               playerInfo
             );

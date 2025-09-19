@@ -21,11 +21,19 @@ class BadgeService {
           type: "achievement",
           threshold: null,
         },
+        // {
+        //   name: "Boss Defeated",
+        //   image: "/badges/boss-defeated.png",
+        //   description: "Defeat a boss",
+        //   code: "boss-defeated",
+        //   type: "achievement",
+        //   threshold: null,
+        // },
         {
-          name: "Boss Defeated",
-          image: "/badges/boss-defeated.png",
-          description: "Defeat a boss",
-          code: "boss-defeated",
+          name: "Team Victory",
+          image: "/badges/team-victory.png",
+          description: "Be part of a winning team",
+          code: "team-victory",
           type: "achievement",
           threshold: null,
         },
@@ -98,14 +106,7 @@ class BadgeService {
   static async getAllPlayerBadges(playerId) {
     try {
       const playerBadges = await UserBadge.findAll({
-        where: { playerId },
-        attributes: [
-          "badgeId",
-          "eventBossId",
-          "eventId",
-          [fn("COUNT", col("badgeId")), "earnCount"],
-          [fn("MAX", col("earnedAt")), "lastEarnedAt"],
-        ],
+        where: { playerId: playerId },
         include: [
           {
             model: Badge,
@@ -154,13 +155,26 @@ class BadgeService {
         throw new Error(`Event with ID ${eventId} not found.`);
       }
 
-      const userBadge = await UserBadge.create({
-        playerId,
-        badgeId,
-        eventBossId: badgeType === "achievement" ? eventBossId : null,
-        eventId,
-        earnedAt: new Date(),
+      const [userBadge, created] = await UserBadge.findOrCreate({
+        where: {
+          playerId: playerId,
+          badgeId: badgeId,
+          eventBossId: badgeType === "achievement" ? eventBossId : null,
+          eventId: eventId,
+        },
+        defaults: {
+          earnCount: 1,
+          lastEarnedAt: new Date(),
+        },
       });
+
+      if (!created) {
+        if (badgeType === "milestone") {
+          throw new Error("Player has already earned this milestone badge.");
+        }
+        await userBadge.increment("earnCount", { by: 1 });
+        await userBadge.update({ lastEarnedAt: new Date() });
+      }
 
       await userBadge.reload({
         include: [
@@ -176,7 +190,8 @@ class BadgeService {
         badgeCode: userBadge.badge.code,
         eventBossId: userBadge.eventBossId,
         eventId: userBadge.eventId,
-        lastEarnedAt: userBadge.earnedAt,
+        earnCount: userBadge.earnCount,
+        lastEarnedAt: userBadge.lastEarnedAt,
       };
     } catch (error) {
       console.error(`Error awarding ${badgeType} badge: ${error}`);

@@ -14,6 +14,11 @@ const Leaderboard = sequelize.define(
       allowNull: false,
       field: "player_id",
     },
+    eventBossId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "event_boss_id",
+    },
     totalDamageDealt: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -24,10 +29,15 @@ const Leaderboard = sequelize.define(
       allowNull: false,
       defaultValue: 0,
     },
-    eventBossId: {
-      type: DataTypes.UUID,
+    totalQuestionsAnswered: {
+      type: DataTypes.INTEGER,
       allowNull: false,
-      field: "event_boss_id",
+      defaultValue: 0,
+    },
+    totalBattlesParticipated: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
     },
   },
   {

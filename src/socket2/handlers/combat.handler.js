@@ -57,13 +57,17 @@ const handleCombat = (io, socket) => {
     }
 
     try {
-      const { answerResult, isPlayerKnockedOut, isEventBossDefeated } =
-        await battleSessionManager.processPlayerAnswer(
-          eventBossId,
-          playerId,
-          choiceIndex,
-          responseTime
-        );
+      const {
+        answerResult,
+        isPlayerKnockedOut,
+        isEventBossDefeated,
+        badgeEarned,
+      } = await battleSessionManager.processPlayerAnswer(
+        eventBossId,
+        playerId,
+        choiceIndex,
+        responseTime
+      );
       if (!answerResult) {
         socket.emit(SOCKET_EVENTS.ERROR, {
           code: SOCKET_ERRORS.NOT_FOUND,
@@ -109,17 +113,26 @@ const handleCombat = (io, socket) => {
         }
       }
 
+      if (badgeEarned) {
+        socket.emit(SOCKET_EVENTS.BADGE.EARNED, {
+          message: `Congratulations! You've earned the ${badgeEarned.name} badge for reaching a milestone of ${badgeEarned.threshold} correct answers!`,
+          data: {
+            badge: badgeEarned,
+          },
+        });
+      }
+
       if (isEventBossDefeated) {
         io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
           SOCKET_EVENTS.BATTLE_SESSION.ENDED,
           { message: "The event boss has been defeated!" }
         );
-        
+
         io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
           SOCKET_EVENTS.BATTLE_SESSION.ENDED,
           { message: "The event boss has been defeated!" }
         );
-        
+
         const updateEventBoss = battleSessionManager.getEventBoss(eventBossId);
         io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
           SOCKET_EVENTS.BOSS_STATUS.UPDATED,
@@ -129,6 +142,45 @@ const handleCombat = (io, socket) => {
             },
           }
         );
+
+        const { mvpPlayer, mvpBadge } =
+          battleSessionManager.getMVPPlayerBadge(eventBossId);
+        if (mvpPlayer && mvpBadge) {
+          io.to(mvpPlayer.socketId).emit(SOCKET_EVENTS.BADGE.EARNED, {
+            message: `Congratulations ${mvpPlayer.nickname}! You've earned the MVP badge for your outstanding performance!`,
+            data: {
+              player: mvpPlayer,
+              badge: mvpBadge,
+            },
+          });
+        }
+
+        const { lastHitPlayer, lastHitBadge } =
+          battleSessionManager.getLastHitPlayerBadge(eventBossId);
+        if (lastHitPlayer && lastHitBadge) {
+          io.to(lastHitPlayer.socketId).emit(SOCKET_EVENTS.BADGE.EARNED, {
+            message: `Congratulations ${lastHitPlayer.nickname}! You've earned the Last Hit badge for delivering the final blow to the boss!`,
+            data: {
+              player: lastHitPlayer,
+              badge: lastHitBadge,
+            },
+          });
+        }
+
+        const { winningTeam, teamVictoryBadge } =
+          battleSessionManager.getWinnerTeamBadge(eventBossId);
+        if (winningTeam && teamVictoryBadge) {
+          io.to(SOCKET_ROOMS.TEAM(eventBossId, winningTeam.teamId)).emit(
+            SOCKET_EVENTS.BADGE.EARNED,
+            {
+              message: `Congratulations Team ${winningTeam.teamName}! You've earned the Team Victory badge for your collective effort!`,
+              data: {
+                team: winningTeam,
+                badge: teamVictoryBadge,
+              },
+            }
+          );
+        }
 
         const reactivatedTimeout = updateEventBoss.cooldownEndTime - Date.now();
         setTimeout(async () => {
@@ -160,6 +212,7 @@ const handleCombat = (io, socket) => {
           },
         }
       );
+
       io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
         SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.UPDATED,
         {

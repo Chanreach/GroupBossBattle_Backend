@@ -4,7 +4,7 @@ export const GAME_CONSTANTS = {
   MINIMUM_HP_THRESHOLD: 30,
   HP_SCALING_PER_PLAYER: 15,
   TEAM_SCALING_FACTOR: 0.2,
-  
+
   MINIMUM_PLAYERS_REQUIRED: 2,
   PLAYER_STARTING_HEARTS: 3,
   REVIVAL_TIMEOUT: 60000,
@@ -46,7 +46,7 @@ export const GAME_CONSTANTS = {
       ACTIVE: "active",
       KNOCKED_OUT: "knocked-out",
       DEAD: "dead",
-    }
+    },
   },
 
   BATTLE_STATE: {
@@ -61,17 +61,27 @@ export const GAME_CONSTANTS = {
     INVALID: "invalid",
   },
 
-  BADGE: {
-    MVP: "mvp",
-    LAST_HIT: "last-hit",
-    BOSS_DEFEATED: "boss-defeated",
+  BADGE_CODES: {
+    ACHIEVEMENT: {
+      MVP: "mvp",
+      LAST_HIT: "last-hit",
+      BOSS_DEFEATED: "boss-defeated",
+      TEAM_VICTORY: "team-victory",
+    },
+    MILESTONE: {
+      QUESTIONS_10: "questions_10",
+      QUESTIONS_25: "questions_25",
+      QUESTIONS_50: "questions_50",
+      QUESTIONS_100: "questions_100",
+    },
   },
 
   MILESTONE_THRESHOLDS: {
-    QUESTIONS: {
-      
-    }
-  }
+    QUESTIONS_10: 10,
+    QUESTIONS_25: 25,
+    QUESTIONS_50: 50,
+    QUESTIONS_100: 100,
+  },
 };
 
 export const getResponseTimeCategory = (responseTime, questionTimeLimit) => {

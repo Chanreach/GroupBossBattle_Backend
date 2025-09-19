@@ -6,7 +6,7 @@ const syncDatabase = async () => {
     console.log("Database connection established successfully.");
 
     // Sync all models with the database
-    await sequelize.sync({ force: false });
+    await sequelize.sync({ force: false, alter: true });
     console.log("Database synchronized successfully.");
   } catch (error) {
     console.error("Error synchronizing the database:", error);
