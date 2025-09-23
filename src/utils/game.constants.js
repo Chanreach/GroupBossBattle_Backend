@@ -1,5 +1,6 @@
 export const GAME_CONSTANTS = {
   BATTLE_COUNTDOWN: 5000,
+  PODIUM_COUNTDOWN: 3000,
 
   MINIMUM_HP_THRESHOLD: 30,
   HP_SCALING_PER_PLAYER: 15,
@@ -45,6 +46,7 @@ export const GAME_CONSTANTS = {
     BATTLE_STATE: {
       ACTIVE: "active",
       KNOCKED_OUT: "knocked-out",
+      REVIVED: "revived",
       DEAD: "dead",
     },
   },

@@ -80,6 +80,11 @@ class TeamManager {
   getTeamNameById(teams, teamId) {
     return this.getTeamById(teams, teamId).name;
   }
+
+  getPlayersInTeam(teams, teamId) {
+    const team = this.getTeamById(teams, teamId);
+    return Array.from(team.players);
+  }
 }
 
 export default TeamManager;

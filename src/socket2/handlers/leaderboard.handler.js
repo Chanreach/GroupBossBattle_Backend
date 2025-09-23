@@ -20,7 +20,6 @@ const handleLeaderboard = (io, socket) => {
       const leaderboard = await battleSessionManager.getPreviewLiveLeaderboard(
         eventBossId
       );
-      console.log(leaderboard.allTimeLeaderboard);
       socket.emit(SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.RESPONSE, {
         data: { leaderboard },
       });

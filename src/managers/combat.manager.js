@@ -51,6 +51,9 @@ class CombatManager {
     if (isCorrect) {
       playerStats.correctAnswers += 1;
       teamStats.correctAnswers += 1;
+
+      playerStats.totalResponseTime += responseTime;
+      teamStats.totalResponseTime += responseTime;
     } else {
       playerStats.incorrectAnswers += 1;
       teamStats.incorrectAnswers += 1;
@@ -58,8 +61,16 @@ class CombatManager {
     }
 
     playerStats.questionsAnswered += 1;
-    teamStats.questionsAnswered += 1;
+    playerStats.averageResponseTime =
+      playerStats.totalResponseTime / playerStats.questionsAnswered;
+    playerStats.accuracy =
+      playerStats.correctAnswers / playerStats.questionsAnswered;
 
+    teamStats.questionsAnswered += 1;
+    teamStats.averageResponseTime =
+      teamStats.totalResponseTime / teamStats.questionsAnswered;
+    teamStats.accuracy = teamStats.correctAnswers / teamStats.questionsAnswered;
+    
     return {
       isCorrect,
       damage,

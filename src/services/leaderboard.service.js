@@ -182,6 +182,7 @@ class LeaderboardService {
             totalQuestionsAnswered: Number(entry.totalQuestionsAnswered),
             totalBattlesParticipated: Number(entry.totalBattlesParticipated),
             accuracy: Number(entry.get("accuracy")) || 0,
+            rank: 0,
           };
         })
       );
@@ -273,6 +274,7 @@ class LeaderboardService {
               entry.get("totalBattlesParticipated")
             ),
             accuracy: Number(entry.get("accuracy")) || 0,
+            rank: 0,
           };
         })
       );

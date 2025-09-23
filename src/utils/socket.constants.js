@@ -83,6 +83,7 @@ export const SOCKET_EVENTS = {
       RECONNECT: "battle-session:player-reconnect",
       RECONNECTED: "battle-session:player-reconnected",
       RECONNECT_FAILED: "battle-session:player-reconnect-failed",
+      NOT_FOUND: "battle-session:player-not-found",
 
       KNOCKED_OUT: "battle-session:player-knocked-out",
       REVIVED: "battle-session:player-revived",
@@ -93,6 +94,8 @@ export const SOCKET_EVENTS = {
       KNOCKED_OUT: "battle-session:teammate-knocked-out",
       REVIVED: "battle-session:teammate-revived",
       DEAD: "battle-session:teammate-dead",
+
+      KNOCKED_OUT_COUNT: "battle-session:teammate-knocked-out-count",
     },
 
     REVIVAL_CODE: {

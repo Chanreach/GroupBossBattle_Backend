@@ -21,6 +21,8 @@ class LeaderboardManager {
         correctAnswers: 0,
         incorrectAnswers: 0,
         questionsAnswered: 0,
+        totalResponseTime: 0,
+        averageResponseTime: 0,
         accuracy: 0,
       });
     });
@@ -41,6 +43,8 @@ class LeaderboardManager {
         correctAnswers: 0,
         incorrectAnswers: 0,
         questionsAnswered: 0,
+        totalResponseTime: 0,
+        averageResponseTime: 0,
         accuracy: 0,
       });
     });
@@ -87,7 +91,9 @@ class LeaderboardManager {
     const individualLeaderboard = this.getIndividualLeaderboard(eventBossId)
       ? this.sortLeaderboardByRank(this.getIndividualLeaderboard(eventBossId))
       : null;
-    const allTimeLeaderboard = await this.getEventBossAllTimeLeaderboard(eventBossId);
+    const allTimeLeaderboard = await this.getEventBossAllTimeLeaderboard(
+      eventBossId
+    );
     return {
       teamLeaderboard,
       individualLeaderboard,
@@ -95,20 +101,24 @@ class LeaderboardManager {
     };
   }
 
-  updateLiveLeaderboard(eventBossId, playerId, data) {
+  updateLiveLeaderboard(eventBossId, playerId, playerStats, teamStats) {
     const player = this.getPlayerById(eventBossId, playerId);
-    player.totalDamage += data.totalDamage;
-    player.correctAnswers += data.correctAnswers;
-    player.incorrectAnswers += data.incorrectAnswers;
-    player.questionsAnswered += data.questionsAnswered;
-    player.accuracy = player.correctAnswers / player.questionsAnswered || 0;
+    player.totalDamage = playerStats.totalDamage;
+    player.correctAnswers = playerStats.correctAnswers;
+    player.incorrectAnswers = playerStats.incorrectAnswers;
+    player.questionsAnswered = playerStats.questionsAnswered;
+    player.totalResponseTime = playerStats.totalResponseTime;
+    player.averageResponseTime = playerStats.averageResponseTime;
+    player.accuracy = playerStats.accuracy;
 
     const team = this.getTeamById(eventBossId, player.teamId);
-    team.totalDamage += data.totalDamage;
-    team.correctAnswers += data.correctAnswers;
-    team.incorrectAnswers += data.incorrectAnswers;
-    team.questionsAnswered += data.questionsAnswered;
-    team.accuracy = team.correctAnswers / team.questionsAnswered || 0;
+    team.totalDamage = teamStats.totalDamage;
+    team.correctAnswers = teamStats.correctAnswers;
+    team.incorrectAnswers = teamStats.incorrectAnswers;
+    team.questionsAnswered = teamStats.questionsAnswered;
+    team.totalResponseTime = teamStats.totalResponseTime;
+    team.averageResponseTime = teamStats.averageResponseTime;
+    team.accuracy = teamStats.accuracy;
   }
 
   async getPlayerStatsByEventId(playerId, eventId) {
@@ -119,7 +129,7 @@ class LeaderboardManager {
     const leaderboard = await LeaderboardService.getEventBossAllTimeLeaderboard(
       eventBossId
     );
-    if (!leaderboard) {
+    if (!leaderboard || leaderboard.length === 0) {
       return null;
     }
 
@@ -136,6 +146,10 @@ class LeaderboardManager {
     const leaderboard = await LeaderboardService.getEventAllTimeLeaderboard(
       eventId
     );
+    if (!leaderboard || leaderboard.length === 0) {
+      return null;
+    }
+    
     const eventAllTimeLeaderboard = new Map();
     leaderboard.forEach((entry) => {
       eventAllTimeLeaderboard.set(entry.playerId, entry);

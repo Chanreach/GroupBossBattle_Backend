@@ -9,6 +9,9 @@ export const initializePlayerStats = () => {
     correctAnswers: 0,
     incorrectAnswers: 0,
     questionsAnswered: 0,
+    totalResponseTime: 0,
+    averageResponseTime: 0,
+    accuracy: 0,
   };
 };
 
@@ -18,6 +21,9 @@ export const initializeTeamStats = () => {
     correctAnswers: 0,
     incorrectAnswers: 0,
     questionsAnswered: 0,
+    totalResponseTime: 0,
+    averageResponseTime: 0,
+    accuracy: 0,
   };
 };
 
@@ -36,8 +42,7 @@ export const calculateBossHP = (numberOfPlayers, numberOfTeams) => {
 };
 
 export const getResponseTimeCategory = (responseTime, questionTimeLimit) => {
-  const timeLimitMs = questionTimeLimit * 1000;
-  const timeRatio = responseTime / timeLimitMs;
+  const timeRatio = responseTime / questionTimeLimit;
 
   let category;
   if (timeRatio <= GAME_CONSTANTS.RESPONSE_TIME_THRESHOLDS.FAST) {
@@ -63,7 +68,6 @@ export const calculateDamage = (isCorrect, responseTime, questionTimeLimit) => {
       responseCategory: "INCORRECT",
     };
   }
-
   return {
     damage:
       GAME_CONSTANTS.BASE_DAMAGE *

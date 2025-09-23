@@ -26,9 +26,8 @@ const handleBattleSession = (io, socket) => {
       );
 
       if (!player) {
-        socket.emit(SOCKET_EVENTS.ERROR, {
-          code: SOCKET_ERRORS.NOT_FOUND,
-          message: SOCKET_MESSAGES.INVALID_JOIN,
+        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.NOT_FOUND, {
+          message: "Player not found in this battle session.",
         });
         return;
       }
@@ -39,6 +38,26 @@ const handleBattleSession = (io, socket) => {
       );
       socket.join(SOCKET_ROOMS.BATTLE_SESSION(eventBossId));
       socket.join(SOCKET_ROOMS.TEAM(eventBossId, teamId));
+
+      const playerHearts = battleSessionManager.getPlayerHearts(
+        eventBossId,
+        playerId
+      );
+      const playerBattleState = battleSessionManager.getPlayerBattleState(
+        eventBossId,
+        playerId
+      );
+      if (playerBattleState === GAME_CONSTANTS.PLAYER.BATTLE_STATE.KNOCKED_OUT) {
+        const knockoutInfo = battleSessionManager.getKnockedOutPlayerInfo(
+          eventBossId,
+          playerId
+        );
+        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.KNOCKED_OUT, {
+          message: "You have been knocked out!",
+          data: knockoutInfo,
+        });
+        return;
+      }
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.JOINED, {
         status: "success",
         message: `You are in team ${teamName}`,
@@ -46,15 +65,12 @@ const handleBattleSession = (io, socket) => {
           eventBoss,
           player: {
             ...player,
+            hearts: playerHearts,
             teamName,
           },
         },
       });
-      socket.broadcast
-        .to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId))
-        .emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.JOINED, {
-          message: `${player.nickname} joined battle session.`,
-        });
+
       socket.broadcast
         .to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId))
         .emit(SOCKET_EVENTS.BATTLE_SESSION.BOSS.HP_UPDATED, {
@@ -65,15 +81,53 @@ const handleBattleSession = (io, socket) => {
             },
           },
         });
-      io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
-        SOCKET_EVENTS.BATTLE_SESSION.LEADERBOARD.UPDATED,
-        {
-          data: {
-            leaderboard:
-              battleSessionManager.getBattleLiveLeaderboard(eventBossId),
-          },
-        }
+
+      if (
+        battleSessionManager.getBattleSessionSize(eventBossId) >
+        GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED
+      ) {
+        socket.broadcast
+          .to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId))
+          .emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.JOINED, {
+            message: `${player.nickname} joined battle session.`,
+          });
+
+        io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.LEADERBOARD.UPDATED,
+          {
+            data: {
+              leaderboard:
+                battleSessionManager.getBattleLiveLeaderboard(eventBossId),
+            },
+          }
+        );
+      }
+
+      if (battleSessionManager.isEventBossDefeated(eventBossId)) {
+        io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.ENDED,
+          {
+            message: "The event boss has been defeated!",
+            data: {
+              podiumEndTime:
+                battleSessionManager.getBattleSession(eventBossId)
+                  .podiumEndTime,
+            },
+          }
+        );
+      }
+
+      const knockedOutPlayers = battleSessionManager.getKnockedOutPlayersByTeam(
+        eventBossId,
+        teamId
       );
+      if (knockedOutPlayers && knockedOutPlayers.length > 0) {
+        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.TEAMMATE.KNOCKED_OUT_COUNT, {
+          message: "Your team has knocked out players.",
+          data: { knockedOutPlayersCount: knockedOutPlayers.length },
+        });
+      }
+
       io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
         SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.UPDATED,
         {

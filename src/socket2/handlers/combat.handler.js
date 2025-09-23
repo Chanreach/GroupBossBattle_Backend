@@ -125,7 +125,14 @@ const handleCombat = (io, socket) => {
       if (isEventBossDefeated) {
         io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
           SOCKET_EVENTS.BATTLE_SESSION.ENDED,
-          { message: "The event boss has been defeated!" }
+          {
+            message: "The event boss has been defeated!",
+            data: {
+              podiumEndTime:
+                battleSessionManager.getBattleSession(eventBossId)
+                  .podiumEndTime,
+            },
+          }
         );
 
         io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
@@ -167,15 +174,15 @@ const handleCombat = (io, socket) => {
           });
         }
 
-        const { winningTeam, teamVictoryBadge } =
+        const { winnerTeam, teamVictoryBadge } =
           battleSessionManager.getWinnerTeamBadge(eventBossId);
-        if (winningTeam && teamVictoryBadge) {
-          io.to(SOCKET_ROOMS.TEAM(eventBossId, winningTeam.teamId)).emit(
+        if (winnerTeam && teamVictoryBadge) {
+          io.to(SOCKET_ROOMS.TEAM(eventBossId, winnerTeam.teamId)).emit(
             SOCKET_EVENTS.BADGE.EARNED,
             {
-              message: `Congratulations Team ${winningTeam.teamName}! You've earned the Team Victory badge for your collective effort!`,
+              message: `Congratulations Team ${winnerTeam.teamName}! You've earned the Team Victory badge for your collective effort!`,
               data: {
-                team: winningTeam,
+                team: winnerTeam,
                 badge: teamVictoryBadge,
               },
             }
@@ -198,8 +205,6 @@ const handleCombat = (io, socket) => {
               },
             }
           );
-
-          battleSessionManager.deleteBattleSession(eventBossId);
         }, reactivatedTimeout);
       }
 

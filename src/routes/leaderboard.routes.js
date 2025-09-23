@@ -3,10 +3,6 @@ import LeaderboardService from "../services/leaderboard.service.js";
 
 const router = express.Router();
 
-/**
- * GET /api/leaderboards/all-time
- * Get all-time leaderboard across all events or for a specific boss
- */
 router.get("/all-time", async (req, res) => {
   try {
     const { limit = 50, bossId, eventBossId } = req.query;
@@ -48,10 +44,6 @@ router.get("/all-time", async (req, res) => {
   }
 });
 
-/**
- * GET /api/leaderboards/event/:eventId
- * Get event overall leaderboard (across all bosses in event)
- */
 router.get("/event/:eventId", async (req, res) => {
   try {
     const { eventId } = req.params;
@@ -78,10 +70,6 @@ router.get("/event/:eventId", async (req, res) => {
   }
 });
 
-/**
- * GET /api/leaderboards/boss/:eventId/:eventBossId
- * Get boss-specific leaderboard
- */
 router.get("/boss/:eventId/:eventBossId", async (req, res) => {
   try {
     const { eventId, eventBossId } = req.params;
@@ -110,10 +98,6 @@ router.get("/boss/:eventId/:eventBossId", async (req, res) => {
   }
 });
 
-/**
- * GET /api/leaderboards/player/:playerId
- * Get stats for a specific player
- */
 router.get("/player/:playerId", async (req, res) => {
   try {
     const { playerId } = req.params;
