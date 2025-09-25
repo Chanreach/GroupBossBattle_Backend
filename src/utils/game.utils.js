@@ -115,3 +115,7 @@ export const generateBattleSessionId = (eventBossId) => {
   const randomSuffix = rng.getRandomInt(0, 9999).toString().padStart(4, "0");
   return `${eventBossId}-${timestamp}-${randomSuffix}`;
 };
+
+export const isApproximatelyEqual = (a, b, tolerance = 1e-6) => {
+  return Math.abs(a - b) <= tolerance;
+};

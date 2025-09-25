@@ -28,7 +28,6 @@ class BadgeManager {
   checkMilestoneEligibility(playerId, eventId, totalCorrectAnswers) {
     const milestones = this.getSortedMilestoneBadges();
     const playerBadges = this.getPlayerBadges(playerId);
-    console.log("Player badges:", playerBadges);
 
     for (const milestone of milestones) {
       if (this.hasEarnedMilestoneBadge(playerBadges, eventId, milestone.code)) {

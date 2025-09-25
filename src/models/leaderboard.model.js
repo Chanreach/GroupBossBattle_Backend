@@ -20,7 +20,7 @@ const Leaderboard = sequelize.define(
       field: "event_boss_id",
     },
     totalDamageDealt: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.DOUBLE,
       allowNull: false,
       defaultValue: 0,
     },

@@ -61,7 +61,7 @@ const handleCombat = (io, socket) => {
         answerResult,
         isPlayerKnockedOut,
         isEventBossDefeated,
-        badgeEarned,
+        playerBadge,
       } = await battleSessionManager.processPlayerAnswer(
         eventBossId,
         playerId,
@@ -113,11 +113,11 @@ const handleCombat = (io, socket) => {
         }
       }
 
-      if (badgeEarned) {
+      if (playerBadge && playerBadge.badge) {
         socket.emit(SOCKET_EVENTS.BADGE.EARNED, {
-          message: `Congratulations! You've earned the ${badgeEarned.name} badge for reaching a milestone of ${badgeEarned.threshold} correct answers!`,
+          message: `Congratulations! You've earned the ${playerBadge.badge.name} badge for reaching a milestone of ${playerBadge.badge.threshold} correct answers!`,
           data: {
-            badge: badgeEarned,
+            playerBadge,
           },
         });
       }
@@ -149,45 +149,6 @@ const handleCombat = (io, socket) => {
             },
           }
         );
-
-        const { mvpPlayer, mvpBadge } =
-          battleSessionManager.getMVPPlayerBadge(eventBossId);
-        if (mvpPlayer && mvpBadge) {
-          io.to(mvpPlayer.socketId).emit(SOCKET_EVENTS.BADGE.EARNED, {
-            message: `Congratulations ${mvpPlayer.nickname}! You've earned the MVP badge for your outstanding performance!`,
-            data: {
-              player: mvpPlayer,
-              badge: mvpBadge,
-            },
-          });
-        }
-
-        const { lastHitPlayer, lastHitBadge } =
-          battleSessionManager.getLastHitPlayerBadge(eventBossId);
-        if (lastHitPlayer && lastHitBadge) {
-          io.to(lastHitPlayer.socketId).emit(SOCKET_EVENTS.BADGE.EARNED, {
-            message: `Congratulations ${lastHitPlayer.nickname}! You've earned the Last Hit badge for delivering the final blow to the boss!`,
-            data: {
-              player: lastHitPlayer,
-              badge: lastHitBadge,
-            },
-          });
-        }
-
-        const { winnerTeam, teamVictoryBadge } =
-          battleSessionManager.getWinnerTeamBadge(eventBossId);
-        if (winnerTeam && teamVictoryBadge) {
-          io.to(SOCKET_ROOMS.TEAM(eventBossId, winnerTeam.teamId)).emit(
-            SOCKET_EVENTS.BADGE.EARNED,
-            {
-              message: `Congratulations Team ${winnerTeam.teamName}! You've earned the Team Victory badge for your collective effort!`,
-              data: {
-                team: winnerTeam,
-                badge: teamVictoryBadge,
-              },
-            }
-          );
-        }
 
         const reactivatedTimeout = updateEventBoss.cooldownEndTime - Date.now();
         setTimeout(async () => {

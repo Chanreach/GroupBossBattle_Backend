@@ -17,7 +17,7 @@ export const SOCKET_EVENTS = {
       REQUEST: "boss-preview:leaderboard-request",
       RESPONSE: "boss-preview:leaderboard-response",
       UPDATED: "boss-preview:leaderboard-updated",
-    }
+    },
   },
 
   // ===== BATTLE QUEUE EVENTS ===== //
@@ -113,6 +113,16 @@ export const SOCKET_EVENTS = {
     },
   },
 
+  // ===== PODIUM EVENTS ===== //
+  PODIUM: {
+    JOIN: "battle-session:podium-join",
+    LEAVE: "battle-session:podium-leave",
+    JOINED: "battle-session:podium-joined",
+    LEFT: "battle-session:podium-left",
+    REQUEST: "battle-session:podium-request",
+    RESPONSE: "battle-session:podium-response",
+  },
+
   // ===== NICKNAME EVENTS ===== //
   NICKNAME: {
     VALIDATION: "nickname:validation",
@@ -142,6 +152,7 @@ export const SOCKET_ROOMS = {
   BATTLE_QUEUE: (eventBattleId) => `battle-queue:${eventBattleId}`,
   BATTLE_SESSION: (eventBossId) => `battle-session:${eventBossId}`,
   TEAM: (eventBossId, teamId) => `team:${eventBossId}:${teamId}`,
+  PODIUM: (eventBossId) => `podium:${eventBossId}`,
 };
 
 // ===== SOCKET ERRORS ===== //
@@ -162,5 +173,14 @@ export const SOCKET_MESSAGES = {
   BATTLE_QUEUE: {
     JOINED: "Successfully joined the battle queue.",
     LEFT: "Successfully left the battle queue.",
+  },
+
+  BADGE_EARNED: {
+    "mvp": (playerName) =>
+      `Congratulations ${playerName}! You've earned the MVP badge for your outstanding performance!`,
+    "last-hit": (playerName) =>
+      `Congratulations ${playerName}! You've earned the Last Hit badge for delivering the final blow!`,
+    "team-victory": (teamName) =>
+      `Congratulations Team ${teamName}! You've earned the Team Victory badge for your collective effort!`,
   },
 };

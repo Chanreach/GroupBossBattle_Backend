@@ -6,7 +6,7 @@ import KnockoutManager from "../managers/knockout.manager.js";
 import badgeManager from "../managers/badge.manager.js";
 import LeaderboardManager from "./leaderboard.manager.js";
 import PlayerSessionService from "../services/player-session.service.js";
-import { generateBattleSessionId } from "../utils/game.utils.js";
+import { generateBattleSessionId, isApproximatelyEqual } from "../utils/game.utils.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
 
 class BattleSessionManager {
@@ -24,12 +24,16 @@ class BattleSessionManager {
   async createBattleSession(eventBossId) {
     const battleSessionId = this.getBattleSessionId(eventBossId);
     const existingSession = this.battleSessions.get(battleSessionId);
-    if (existingSession && existingSession.state === GAME_CONSTANTS.BATTLE_STATE.ENDED) {
+    if (
+      existingSession &&
+      existingSession.state === GAME_CONSTANTS.BATTLE_STATE.ENDED
+    ) {
       this.deleteBattleSession(battleSessionId);
     }
 
     try {
-      const newBattleSessionId = this.generateUniqueBattleSessionId(eventBossId);
+      const newBattleSessionId =
+        this.generateUniqueBattleSessionId(eventBossId);
       const battleSession = {
         id: newBattleSessionId,
         eventBoss: {},
@@ -194,7 +198,7 @@ class BattleSessionManager {
     await this.badgeManager.initializePlayerBadges(player.playerSessionId);
 
     const playerStats = await this.leaderboardManager.getPlayerStatsByEventId(
-      player.id,
+      player.playerSessionId,
       battleSession.event.id
     );
     player.totalCorrectAnswers = playerStats
@@ -235,7 +239,10 @@ class BattleSessionManager {
     const question = this.getCurrentQuestionForPlayer(eventBossId, playerId);
 
     let answerResult;
-    let badgeEarned = null;
+    const playerBadge = {
+      player,
+      badge: null,
+    };
     if (choiceIndex == -1 && responseTime == question.timeLimit) {
       answerResult = this.combatManager.processQuestionTimeout(
         battleSession.combat,
@@ -275,9 +282,8 @@ class BattleSessionManager {
           battleSession.event.id,
           badgeCode
         );
-        badgeEarned = this.badgeManager.getBadgeByCode(badgeCode);
+        playerBadge.badge = this.badgeManager.getBadgeByCode(badgeCode);
       }
-      console.log(`Player ${player.nickname} earned badge: ${badgeCode}`);
     }
 
     if (answerResult.playerHearts <= 0) {
@@ -326,7 +332,7 @@ class BattleSessionManager {
       answerResult,
       isEventBossDefeated,
       isPlayerKnockedOut: this.isPlayerKnockedOut(eventBossId, playerId),
-      badgeEarned,
+      playerBadge,
     };
   }
 
@@ -479,20 +485,23 @@ class BattleSessionManager {
     let mvpPlayerId = null;
     let highestDamage = -1;
     let highestAccuracy = -1;
-    let lastHitPlayerId = battleSession.achievementAwards.lastHit;
+    let lowestAvgResponseTime = Infinity;
+    const lastHitPlayerId = battleSession.achievementAwards.lastHit;
     for (const [playerId, stats] of battleSession.combat.playerStats) {
-      const accuracy = stats.questionsAnswered
-        ? stats.correctAnswers / stats.questionsAnswered
-        : 0;
       if (
         stats.totalDamage > highestDamage ||
-        (stats.totalDamage === highestDamage && accuracy > highestAccuracy) ||
         (stats.totalDamage === highestDamage &&
-          accuracy === highestAccuracy &&
+          stats.accuracy > highestAccuracy) ||
+        (stats.totalDamage === highestDamage &&
+          stats.accuracy === highestAccuracy &&
+          stats.averageResponseTime < lowestAvgResponseTime) ||
+        (stats.totalDamage === highestDamage &&
+          stats.accuracy === highestAccuracy &&
+          isApproximatelyEqual(stats.averageResponseTime, lowestAvgResponseTime) &&
           playerId === lastHitPlayerId)
       ) {
         highestDamage = stats.totalDamage;
-        highestAccuracy = accuracy;
+        highestAccuracy = stats.accuracy;
         mvpPlayerId = playerId;
       }
     }
@@ -542,8 +551,8 @@ class BattleSessionManager {
       GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.MVP
     );
     return {
-      mvpPlayer,
-      mvpBadge,
+      player: mvpPlayer,
+      badge: mvpBadge,
     };
   }
 
@@ -558,8 +567,8 @@ class BattleSessionManager {
       GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.LAST_HIT
     );
     return {
-      lastHitPlayer,
-      lastHitBadge,
+      player: lastHitPlayer,
+      badge: lastHitBadge,
     };
   }
 
@@ -574,8 +583,8 @@ class BattleSessionManager {
       GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.TEAM_VICTORY
     );
     return {
-      winnerTeam,
-      teamVictoryBadge,
+      team: winnerTeam,
+      badge: teamVictoryBadge,
     };
   }
 
@@ -589,10 +598,43 @@ class BattleSessionManager {
     );
   }
 
-  async getFinalizedLeaderboard(eventBossId) {
-    return await this.leaderboardManager.getComprehensiveLiveLeaderboard(
-      eventBossId
-    );
+  getPlayerBadgesFromBattleSession(eventBossId, playerId) {
+    const player = this.getPlayerFromBattleSession(eventBossId, playerId);
+    let playerBadges = [];
+
+    const mvpAward = this.getMVPPlayerBadge(eventBossId);
+    const lastHitAward = this.getLastHitPlayerBadge(eventBossId);
+    const teamVictoryAward = this.getWinnerTeamBadge(eventBossId);
+
+    if (player.id === mvpAward.player.id && mvpAward.badge) {
+      playerBadges.push(mvpAward);
+    }
+    if (player.id === lastHitAward.player.id && lastHitAward.badge) {
+      playerBadges.push(lastHitAward);
+    }
+    if (
+      player.teamId === teamVictoryAward.team.teamId &&
+      teamVictoryAward.badge
+    ) {
+      playerBadges.push(teamVictoryAward);
+    }
+
+    return playerBadges;
+  }
+
+  async getBattlePodium(eventBossId) {
+    const leaderboard =
+      await this.leaderboardManager.getComprehensiveLiveLeaderboard(
+        eventBossId
+      );
+    const podium = leaderboard.teamLeaderboard
+      ? leaderboard.teamLeaderboard.slice(0, 3)
+      : [];
+
+    return {
+      leaderboard,
+      podium,
+    };
   }
 
   isEventBossDefeated(eventBossId) {
@@ -640,6 +682,11 @@ class BattleSessionManager {
       }
     }
     return null;
+  }
+
+  getBattleState(eventBossId) {
+    const battleSession = this.findBattleSession(eventBossId);
+    return battleSession ? battleSession.state : null;
   }
 
   hasBattleSession(eventBossId) {
