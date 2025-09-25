@@ -84,6 +84,13 @@ export const GAME_CONSTANTS = {
     QUESTIONS_50: 50,
     QUESTIONS_100: 100,
   },
+
+  PLAYER_BATTLE_STATE_SCORE: {
+    "active": 1,
+    "revived": 0.75,
+    "knocked-out": 0.5,
+    "dead": 0,
+  }
 };
 
 export const getResponseTimeCategory = (responseTime, questionTimeLimit) => {

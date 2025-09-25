@@ -47,7 +47,9 @@ const handleBattleSession = (io, socket) => {
         eventBossId,
         playerId
       );
-      if (playerBattleState === GAME_CONSTANTS.PLAYER.BATTLE_STATE.KNOCKED_OUT) {
+      if (
+        playerBattleState === GAME_CONSTANTS.PLAYER.BATTLE_STATE.KNOCKED_OUT
+      ) {
         const knockoutInfo = battleSessionManager.getKnockedOutPlayerInfo(
           eventBossId,
           playerId
@@ -132,8 +134,9 @@ const handleBattleSession = (io, socket) => {
         SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.UPDATED,
         {
           data: {
-            leaderboard:
-              battleSessionManager.getPreviewLiveLeaderboard(eventBossId),
+            leaderboard: await battleSessionManager.getPreviewLiveLeaderboard(
+              eventBossId
+            ),
           },
         }
       );
@@ -177,8 +180,12 @@ const handleBattleSession = (io, socket) => {
     }
 
     try {
-      const sessionSize =
-        battleSessionManager.getBattleSessionSize(eventBossId);
+      const eventBossStatus =
+        battleSessionManager.getEventBossStatus(eventBossId);
+      let sessionSize = 0;
+      if (eventBossStatus && eventBossStatus === "in-battle") {
+        sessionSize = battleSessionManager.getBattleSessionSize(eventBossId);
+      }
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.SIZE.RESPONSE, {
         data: { sessionSize },
       });

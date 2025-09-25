@@ -119,3 +119,12 @@ export const generateBattleSessionId = (eventBossId) => {
 export const isApproximatelyEqual = (a, b, tolerance = 1e-6) => {
   return Math.abs(a - b) <= tolerance;
 };
+
+export const compareScores = (a, b) => {
+  for (let i = 0; i < a.length; i++) {
+    console.log(a[i], b[i]);
+    if (isApproximatelyEqual(a[i], b[i])) continue;
+    return a[i] > b[i] ? 1 : -1;
+  }
+  return 0;
+};

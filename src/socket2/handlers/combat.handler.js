@@ -166,6 +166,15 @@ const handleCombat = (io, socket) => {
               },
             }
           );
+
+          io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+            SOCKET_EVENTS.BATTLE_SESSION.SIZE.UPDATED,
+            {
+              data: {
+                sessionSize: 0,
+              },
+            }
+          );
         }, reactivatedTimeout);
       }
 
@@ -183,8 +192,9 @@ const handleCombat = (io, socket) => {
         SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.UPDATED,
         {
           data: {
-            leaderboard:
-              battleSessionManager.getPreviewLiveLeaderboard(eventBossId),
+            leaderboard: await battleSessionManager.getPreviewLiveLeaderboard(
+              eventBossId
+            ),
           },
         }
       );

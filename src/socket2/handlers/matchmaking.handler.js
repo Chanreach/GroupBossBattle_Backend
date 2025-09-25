@@ -57,7 +57,17 @@ const handleMatchmaking = (io, socket) => {
           SOCKET_EVENTS.BATTLE_SESSION.SIZE.UPDATED,
           {
             data: {
-              sessionSize: battleSessionManager.getBattleSessionSize(eventBossId),
+              sessionSize:
+                battleSessionManager.getBattleSessionSize(eventBossId),
+            },
+          }
+        );
+        io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.UPDATED,
+          {
+            data: {
+              queueSize: 0,
+              isBattleStarted: true,
             },
           }
         );

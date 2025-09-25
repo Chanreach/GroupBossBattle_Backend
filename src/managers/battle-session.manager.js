@@ -6,7 +6,7 @@ import KnockoutManager from "../managers/knockout.manager.js";
 import badgeManager from "../managers/badge.manager.js";
 import LeaderboardManager from "./leaderboard.manager.js";
 import PlayerSessionService from "../services/player-session.service.js";
-import { generateBattleSessionId, isApproximatelyEqual } from "../utils/game.utils.js";
+import { generateBattleSessionId, compareScores } from "../utils/game.utils.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
 
 class BattleSessionManager {
@@ -483,28 +483,30 @@ class BattleSessionManager {
 
   findMVPPlayerId(battleSession) {
     let mvpPlayerId = null;
-    let highestDamage = -1;
-    let highestAccuracy = -1;
-    let lowestAvgResponseTime = Infinity;
+    let highestScore = null;
     const lastHitPlayerId = battleSession.achievementAwards.lastHit;
+
     for (const [playerId, stats] of battleSession.combat.playerStats) {
-      if (
-        stats.totalDamage > highestDamage ||
-        (stats.totalDamage === highestDamage &&
-          stats.accuracy > highestAccuracy) ||
-        (stats.totalDamage === highestDamage &&
-          stats.accuracy === highestAccuracy &&
-          stats.averageResponseTime < lowestAvgResponseTime) ||
-        (stats.totalDamage === highestDamage &&
-          stats.accuracy === highestAccuracy &&
-          isApproximatelyEqual(stats.averageResponseTime, lowestAvgResponseTime) &&
-          playerId === lastHitPlayerId)
-      ) {
-        highestDamage = stats.totalDamage;
-        highestAccuracy = stats.accuracy;
+      const player = this.getPlayerFromBattleSession(
+        battleSession.eventBoss.id,
+        playerId
+      );
+      const score = [
+        stats.totalDamage,
+        stats.accuracy,
+        -stats.averageResponseTime,
+        GAME_CONSTANTS.PLAYER_BATTLE_STATE_SCORE[player.battleState],
+        stats.hearts,
+        player.revivedCount,
+        playerId === lastHitPlayerId ? 1 : 0,
+      ];
+      console.log(`Player ${playerId} score:`, score);
+      if (!highestScore || compareScores(score, highestScore) > 0) {
+        highestScore = score;
         mvpPlayerId = playerId;
       }
     }
+
     battleSession.achievementAwards.mvp = mvpPlayerId;
     return mvpPlayerId;
   }
@@ -593,6 +595,7 @@ class BattleSessionManager {
   }
 
   async getPreviewLiveLeaderboard(eventBossId) {
+    console.log("Preview leaderboard: ", await this.leaderboardManager.getComprehensiveLiveLeaderboard(eventBossId));
     return await this.leaderboardManager.getComprehensiveLiveLeaderboard(
       eventBossId
     );
@@ -723,6 +726,11 @@ class BattleSessionManager {
   getEventBoss(eventBossId) {
     const battleSession = this.getBattleSession(eventBossId);
     return battleSession.eventBoss;
+  }
+
+  getEventBossStatus(eventBossId) {
+    const battleSession = this.findBattleSession(eventBossId);
+    return battleSession ? battleSession.eventBoss.status : null;
   }
 
   getPlayerFromBattleSession(eventBossId, playerId) {
