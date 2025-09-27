@@ -1,4 +1,4 @@
-import { Op, fn, col } from "sequelize";
+import { Op } from "sequelize";
 import { Event, Badge, UserBadge } from "../models/index.js";
 
 class BadgeService {

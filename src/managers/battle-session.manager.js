@@ -595,7 +595,6 @@ class BattleSessionManager {
   }
 
   async getPreviewLiveLeaderboard(eventBossId) {
-    console.log("Preview leaderboard: ", await this.leaderboardManager.getComprehensiveLiveLeaderboard(eventBossId));
     return await this.leaderboardManager.getComprehensiveLiveLeaderboard(
       eventBossId
     );
@@ -786,9 +785,19 @@ class BattleSessionManager {
   }
 
   getPlayerBattleState(eventBossId, playerId) {
-    const battleSession = this.getBattleSession(eventBossId);
     const player = this.getPlayerFromBattleSession(eventBossId, playerId);
     return player.battleState;
+  }
+
+  getActivePlayersCount(eventBossId) {
+    const battleSession = this.getBattleSession(eventBossId);
+    let count = 0;
+    for (const player of battleSession.players.values()) {
+      if (player.isConnected) {
+        count++;
+      }
+    }
+    return count;
   }
 
   generateUniqueBattleSessionId(eventBossId) {

@@ -123,6 +123,17 @@ export const SOCKET_EVENTS = {
     RESPONSE: "battle-session:podium-response",
   },
 
+  // ===== BATTLE MONITOR EVENTS ===== //
+  BATTLE_MONITOR: {
+    JOIN: "battle-monitor:join",
+    LEAVE: "battle-monitor:leave",
+    JOINED: "battle-monitor:joined",
+    LEFT: "battle-monitor:left",
+    REQUEST: "battle-monitor:request",
+    RESPONSE: "battle-monitor:response",
+    UPDATED: "battle-monitor:updated",
+  },
+
   // ===== NICKNAME EVENTS ===== //
   NICKNAME: {
     VALIDATION: "nickname:validation",
@@ -153,6 +164,7 @@ export const SOCKET_ROOMS = {
   BATTLE_SESSION: (eventBossId) => `battle-session:${eventBossId}`,
   TEAM: (eventBossId, teamId) => `team:${eventBossId}:${teamId}`,
   PODIUM: (eventBossId) => `podium:${eventBossId}`,
+  BATTLE_MONITOR: (eventBossId) => `battle-monitor:${eventBossId}`,
 };
 
 // ===== SOCKET ERRORS ===== //

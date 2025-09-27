@@ -85,6 +85,19 @@ const handleCombat = (io, socket) => {
           .emit(SOCKET_EVENTS.BATTLE_SESSION.BOSS.DAMAGED, {
             data: answerResult,
           });
+
+        const updateEventBoss = battleSessionManager.getEventBoss(eventBossId);
+        io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.BOSS.DAMAGED,
+          {
+            data: {
+              eventBoss: updateEventBoss,
+              leaderboard: await battleSessionManager.getPreviewLiveLeaderboard(
+                eventBossId
+              ),
+            },
+          }
+        );
       }
 
       if (isPlayerKnockedOut) {

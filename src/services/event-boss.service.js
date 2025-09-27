@@ -1,4 +1,5 @@
 import { EventBoss, Boss, Event } from "../models/index.js";
+import UserService from "./user.service.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
 
 class EventBossService {
@@ -40,7 +41,7 @@ class EventBossService {
           startTime: eventBoss.event.startTime,
           endTime: eventBoss.event.endTime,
           status: eventBoss.event.status,
-        }
+        },
       };
     } catch (error) {
       console.error("Error fetching event boss by ID:", error);
@@ -66,6 +67,37 @@ class EventBossService {
       return eventBoss;
     } catch (error) {
       console.error("Error updating event boss status:", error);
+      throw error;
+    }
+  }
+
+  static async isAllowedToSpectate(eventBossId, spectatorId) {
+    try {
+      const eventBoss = await EventBoss.findByPk(eventBossId);
+      if (!eventBoss) {
+        throw new Error("Event boss not found");
+      }
+
+      const spectator = await UserService.getUserById(spectatorId);
+      if (!spectator) {
+        throw new Error("Spectator not found");
+      }
+
+      return eventBoss.creatorId === spectator.id || spectator.role === "admin";
+    } catch (error) {
+      console.error("Error checking spectator permissions:", error);
+      throw error;
+    }
+  }
+
+  static async getEventById(eventId) {
+    try {
+      const event = await Event.findByPk(eventId, {
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+      });
+      return event;
+    } catch (error) {
+      console.error("Error fetching event by ID:", error);
       throw error;
     }
   }

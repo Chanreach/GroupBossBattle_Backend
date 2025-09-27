@@ -103,6 +103,23 @@ const handleBattleSession = (io, socket) => {
             },
           }
         );
+
+        io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.PLAYER.JOINED,
+          {
+            data: {
+              eventBoss: {
+                currentHP: eventBoss.currentHP,
+                maxHP: eventBoss.maxHP,
+              },
+              activePlayers: battleSessionManager.getActivePlayersCount(
+                eventBossId
+              ),
+              leaderboard:
+                battleSessionManager.getPreviewLiveLeaderboard(eventBossId),
+            },
+          }
+        );
       }
 
       if (battleSessionManager.isEventBossDefeated(eventBossId)) {
@@ -169,6 +186,18 @@ const handleBattleSession = (io, socket) => {
     }
 
     socket.leave(SOCKET_ROOMS.BATTLE_SESSION(eventBossId));
+
+    io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+      SOCKET_EVENTS.BATTLE_SESSION.PLAYER.LEFT,
+      {
+        message: `A player has left the battle session.`,
+        data: {
+          activePlayers: battleSessionManager.getActivePlayersCount(
+            eventBossId
+          ),
+        }
+      }
+    );
   });
 
   socket.on(SOCKET_EVENTS.BATTLE_SESSION.SIZE.REQUEST, (eventBossId) => {
@@ -262,6 +291,16 @@ const handleBattleSession = (io, socket) => {
         }
       );
       battleSessionManager.addPlayerToLeaderboard(eventBossId, player.id);
+
+      io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+        SOCKET_EVENTS.BATTLE_SESSION.PLAYER.JOINED,
+        {
+          data: {
+            leaderboard:
+              battleSessionManager.getBattleLiveLeaderboard(eventBossId),
+          },
+        }
+      );
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {

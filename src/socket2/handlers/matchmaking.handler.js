@@ -71,6 +71,21 @@ const handleMatchmaking = (io, socket) => {
             },
           }
         );
+        io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.START,
+          {
+            message: "Battle has started!",
+            data: {
+              eventBoss: battleSessionManager.getEventBoss(eventBossId),
+              battleState: battleSessionManager.getBattleState(eventBossId),
+              activePlayers:
+                battleSessionManager.getActivePlayersCount(eventBossId),
+              leaderboard: await battleSessionManager.getPreviewLiveLeaderboard(
+                eventBossId
+              ),
+            },
+          }
+        );
       }
     } catch (error) {
       socket.emit(SOCKET_EVENTS.ERROR, {
