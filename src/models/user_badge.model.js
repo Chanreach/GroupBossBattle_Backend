@@ -9,7 +9,7 @@ const UserBadge = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    playerId: {
+    userId: {
       type: DataTypes.UUID,
       allowNull: false,
     },

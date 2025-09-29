@@ -6,7 +6,6 @@ import Category from "./category.model.js";
 import Question from "./question.model.js";
 import AnswerChoice from "./answer_choice.model.js";
 import EventBoss from "./event_boss.model.js";
-import PlayerSession from "./player_session.model.js";
 import Badge from "./badge.model.js";
 import UserBadge from "./user_badge.model.js";
 import Leaderboard from "./leaderboard.model.js";
@@ -21,7 +20,6 @@ export {
   Question,
   AnswerChoice,
   EventBoss,
-  PlayerSession,
   Badge,
   UserBadge,
   Leaderboard,

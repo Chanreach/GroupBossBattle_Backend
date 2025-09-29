@@ -9,15 +9,17 @@ const Leaderboard = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    playerId: {
+    userId: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: "player_id",
+    },
+    eventId: {
+      type: DataTypes.UUID,
+      allowNull: false,
     },
     eventBossId: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: "event_boss_id",
     },
     totalDamageDealt: {
       type: DataTypes.DOUBLE,
@@ -44,20 +46,6 @@ const Leaderboard = sequelize.define(
     tableName: "leaderboards",
     timestamps: true,
     underscored: true,
-    indexes: [
-      {
-        fields: ["player_id"],
-      },
-      {
-        fields: ["event_boss_id"],
-      },
-      {
-        fields: ["total_damage_dealt"],
-      },
-      {
-        fields: ["total_correct_answers"],
-      },
-    ],
   }
 );
 

@@ -11,7 +11,7 @@ import BadgeService from "../../services/badge.service.js";
 import { badgeManager, BADGE_DEFINITIONS } from "../../utils/badge-system.js";
 import {
   EventBoss,
-  PlayerSession,
+  // PlayerSession,
   Leaderboard,
   Badge,
   UserBadge,

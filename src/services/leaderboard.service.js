@@ -2,7 +2,6 @@ import {
   Leaderboard,
   User,
   EventBoss,
-  PlayerSession,
 } from "../models/index.js";
 import { Op, fn, col, literal } from "sequelize";
 

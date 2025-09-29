@@ -19,16 +19,24 @@ const User = sequelize.define(
     },
     email: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       unique: true,
     },
     password: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     role: {
       type: DataTypes.ENUM("player", "host", "admin"),
       defaultValue: "player",
+    },
+    isGuest: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    lastActiveAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
   },
   {
