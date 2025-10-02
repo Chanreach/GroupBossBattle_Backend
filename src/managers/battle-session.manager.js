@@ -5,7 +5,6 @@ import CombatManager from "../managers/combat.manager.js";
 import KnockoutManager from "../managers/knockout.manager.js";
 import badgeManager from "../managers/badge.manager.js";
 import LeaderboardManager from "./leaderboard.manager.js";
-import PlayerSessionService from "../services/player-session.service.js";
 import { generateBattleSessionId, compareScores } from "../utils/game.utils.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
 
@@ -108,6 +107,7 @@ class BattleSessionManager {
     );
 
     return {
+      battleSessionId: battleSession.id,
       player,
       sessionSize: battleSession.players.size,
     };
@@ -187,18 +187,10 @@ class BattleSessionManager {
     this.combatManager.initializePlayerStats(battleSession.combat, player.id);
     player.revivedCount = 0;
 
-    const userId = player.isGuest ? null : player.id;
-    const playerSession = await PlayerSessionService.createPlayerSession(
-      userId,
-      player.username,
-      battleSession.event.id
-    );
-    player.playerSessionId = playerSession.id;
-
-    await this.badgeManager.initializePlayerBadges(player.playerSessionId);
+    await this.badgeManager.initializePlayerBadges(player.id);
 
     const playerStats = await this.leaderboardManager.getPlayerStatsByEventId(
-      player.playerSessionId,
+      player.id,
       battleSession.event.id
     );
     player.totalCorrectAnswers = playerStats
@@ -271,13 +263,13 @@ class BattleSessionManager {
       player.totalCorrectAnswers += 1;
 
       const badgeCode = this.badgeManager.checkMilestoneEligibility(
-        player.playerSessionId,
+        player.id,
         battleSession.event.id,
         player.totalCorrectAnswers
       );
       if (badgeCode) {
         await this.awardBadgeToPlayer(
-          player.playerSessionId,
+          player.id,
           eventBossId,
           battleSession.event.id,
           badgeCode
@@ -291,20 +283,7 @@ class BattleSessionManager {
       this.knockoutManager.addKnockedOutPlayer(battleSession.id, player.id);
     }
 
-    const playerStats = this.combatManager.getPlayerStats(
-      battleSession.combat,
-      player.id
-    );
-    const teamStats = this.combatManager.getTeamStats(
-      battleSession.combat,
-      player.teamId
-    );
-    this.leaderboardManager.updateLiveLeaderboard(
-      eventBossId,
-      player.id,
-      playerStats,
-      teamStats
-    );
+    this.updateBattleLiveLeaderboard(eventBossId, player.id);
 
     const isEventBossDefeated = this.isEventBossDefeated(eventBossId);
     if (isEventBossDefeated) {
@@ -317,7 +296,8 @@ class BattleSessionManager {
           player.id
         );
         await this.leaderboardManager.updateEventBossAllTimeLeaderboard(
-          player.playerSessionId,
+          player.id,
+          battleSession.event.id,
           eventBossId,
           {
             totalDamage: playerStats ? playerStats.totalDamage : 0,
@@ -334,6 +314,28 @@ class BattleSessionManager {
       isPlayerKnockedOut: this.isPlayerKnockedOut(eventBossId, playerId),
       playerBadge,
     };
+  }
+
+  updateBattleLiveLeaderboard(eventBossId, playerId) {
+    const battleSession = this.getBattleSession(eventBossId);
+    const player = this.getPlayerFromBattleSession(eventBossId, playerId);
+    const playerStats = this.combatManager.getPlayerStats(
+      battleSession.combat,
+      player.id
+    );
+    playerStats.revivedCount = player.revivedCount;
+    const teamStats = this.combatManager.getTeamStats(
+      battleSession.combat,
+      player.teamId
+    );
+
+    this.leaderboardManager.updateLiveLeaderboard(
+      eventBossId,
+      player.id,
+      playerStats,
+      teamStats
+    );
+    return this.leaderboardManager.getLiveLeaderboard(eventBossId);
   }
 
   async handleEventBossDefeat(eventBossId) {
@@ -369,7 +371,7 @@ class BattleSessionManager {
     for (const player of battleSession.players.values()) {
       if (player.id === mvpPlayerId) {
         await this.awardBadgeToPlayer(
-          player.playerSessionId,
+          player.id,
           eventBossId,
           battleSession.event.id,
           GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.MVP
@@ -377,7 +379,7 @@ class BattleSessionManager {
       }
       if (player.teamId === winnerTeamId) {
         await this.awardBadgeToPlayer(
-          player.playerSessionId,
+          player.id,
           eventBossId,
           battleSession.event.id,
           GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.TEAM_VICTORY
@@ -385,7 +387,7 @@ class BattleSessionManager {
       }
       if (player.id === lastHitPlayerId) {
         await this.awardBadgeToPlayer(
-          player.playerSessionId,
+          player.id,
           eventBossId,
           battleSession.event.id,
           GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.LAST_HIT
@@ -462,6 +464,7 @@ class BattleSessionManager {
       );
       knockedOutPlayer.battleState = GAME_CONSTANTS.PLAYER.BATTLE_STATE.REVIVED;
       reviver.revivedCount += 1;
+      this.updateBattleLiveLeaderboard(eventBossId, reviver.id);
     } else if (response.reason === GAME_CONSTANTS.REVIVAL_CODE.EXPIRED) {
       this.handleRevivalCodeExpiry(eventBossId, response.knockedOutPlayerId);
     }
@@ -741,8 +744,8 @@ class BattleSessionManager {
   }
 
   findPlayerInBattleSession(eventBossId, playerId) {
-    const battleSession = this.getBattleSession(eventBossId);
-    return battleSession.players.get(playerId) || null;
+    const battleSession = this.findBattleSession(eventBossId);
+    return battleSession ? battleSession.players.get(playerId) || null : null;
   }
 
   getPlayerTeamInfo(eventBossId, playerId) {

@@ -13,6 +13,10 @@ export const SOCKET_EVENTS = {
     JOINED: "boss-preview:joined",
     LEFT: "boss-preview:left",
 
+    BATTLE_SESSION: {
+      ENDED: "boss-preview:battle-session-ended",
+    },
+    
     LEADERBOARD: {
       REQUEST: "boss-preview:leaderboard-request",
       RESPONSE: "boss-preview:leaderboard-response",
@@ -38,6 +42,8 @@ export const SOCKET_EVENTS = {
   BATTLE_SESSION: {
     COUNTDOWN: "battle-session:countdown",
     START: "battle-session:start",
+    REQUEST: "battle-session:request",
+    RESPONSE: "battle-session:response",
     ENDED: "battle-session:ended",
 
     JOIN: "battle-session:join",

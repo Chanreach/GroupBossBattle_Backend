@@ -136,6 +136,10 @@ const handleCombat = (io, socket) => {
       }
 
       if (isEventBossDefeated) {
+        console.log(
+          "Event boss defeated!",
+          battleSessionManager.getBattleSession(eventBossId).podiumEndTime
+        );
         io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
           SOCKET_EVENTS.BATTLE_SESSION.ENDED,
           {
@@ -149,8 +153,13 @@ const handleCombat = (io, socket) => {
         );
 
         io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
-          SOCKET_EVENTS.BATTLE_SESSION.ENDED,
-          { message: "The event boss has been defeated!" }
+          SOCKET_EVENTS.BOSS_PREVIEW.BATTLE_SESSION.ENDED,
+          {
+            message: "The event boss has been defeated!",
+            data: {
+              session: battleSessionManager.getBattleSession(eventBossId),
+            },
+          }
         );
 
         const updateEventBoss = battleSessionManager.getEventBoss(eventBossId);

@@ -112,9 +112,8 @@ const handleBattleSession = (io, socket) => {
                 currentHP: eventBoss.currentHP,
                 maxHP: eventBoss.maxHP,
               },
-              activePlayers: battleSessionManager.getActivePlayersCount(
-                eventBossId
-              ),
+              activePlayers:
+                battleSessionManager.getActivePlayersCount(eventBossId),
               leaderboard:
                 battleSessionManager.getPreviewLiveLeaderboard(eventBossId),
             },
@@ -187,15 +186,18 @@ const handleBattleSession = (io, socket) => {
 
     socket.leave(SOCKET_ROOMS.BATTLE_SESSION(eventBossId));
 
+    socket.emit(SOCKET_EVENTS.BATTLE_SESSION.LEFT, {
+      message: "You have left the battle session.",
+    });
+
     io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
       SOCKET_EVENTS.BATTLE_SESSION.PLAYER.LEFT,
       {
         message: `A player has left the battle session.`,
         data: {
-          activePlayers: battleSessionManager.getActivePlayersCount(
-            eventBossId
-          ),
-        }
+          activePlayers:
+            battleSessionManager.getActivePlayersCount(eventBossId),
+        },
       }
     );
   });
@@ -209,14 +211,40 @@ const handleBattleSession = (io, socket) => {
     }
 
     try {
-      const eventBossStatus =
-        battleSessionManager.getEventBossStatus(eventBossId);
+      const eventBossStatus = battleSessionManager.getEventBossStatus(eventBossId);
       let sessionSize = 0;
       if (eventBossStatus && eventBossStatus === "in-battle") {
         sessionSize = battleSessionManager.getBattleSessionSize(eventBossId);
       }
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.SIZE.RESPONSE, {
         data: { sessionSize },
+      });
+    } catch (error) {
+      console.log(error);
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        code: SOCKET_ERRORS.INTERNAL_SERVER,
+        message: "An error occurred while fetching the session size.",
+      });
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.BATTLE_SESSION.REQUEST, (eventBossId) => {
+    if (!eventBossId) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: "Invalid eventBossId.",
+      });
+      return;
+    }
+
+    try {
+      const session = battleSessionManager.findBattleSession(eventBossId);
+
+      let sessionSize = 0;
+      if (session && session.status !== "ended") {
+        sessionSize = battleSessionManager.getBattleSessionSize(eventBossId);
+      }
+      socket.emit(SOCKET_EVENTS.BATTLE_SESSION.RESPONSE, {
+        data: { session, sessionSize },
       });
     } catch (error) {
       console.log(error);
@@ -279,6 +307,7 @@ const handleBattleSession = (io, socket) => {
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.COUNTDOWN, {
         message: "Battle is starting!",
         data: {
+          battleSessionId: response.battleSessionId,
           countdownEndTime: Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN,
         },
       });
@@ -349,19 +378,12 @@ const handleBattleSession = (io, socket) => {
                 eventBossId,
                 playerId
               ),
-            questionTimeRemaining: Math.max(
-              0,
-              Math.ceil(
-                (currentQuestion.timeLimit -
-                  (Date.now() - currentQuestion.startTime)) /
-                  1000
-              )
-            ),
+            questionEndTime: currentQuestion.endTime,
           }
         : {
             currentQuestion: null,
             currentQuestionNumber: 0,
-            questionTimeRemaining: 0,
+            questionEndTime: null,
           };
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.RECONNECTED, {
         message: `Reconnected to battle session.`,

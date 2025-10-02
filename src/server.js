@@ -22,8 +22,11 @@ import joinRoutes from "./routes/join.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import badgeRoutes from "./routes/badge.routes.js";
 import leaderboardRoutes from "./routes/leaderboard.routes.js";
+import heartBeatRoutes from "./routes/heartbeat.routes.js";
 
 import "./schedulers/event-status-updater.js";
+import "./schedulers/event-boss-status-updater.js";
+import "./schedulers/cleanup-inactive-guests.js";
 import setupSocket from "./socket2/index.js";
 
 dotenv.config();
@@ -61,6 +64,7 @@ app.use("/api/boss-preview", bossPreviewRoutes);
 app.use("/api/join", joinRoutes);
 app.use("/api/badges", badgeRoutes);
 app.use("/api/leaderboards", leaderboardRoutes);
+app.use("/api/heartbeat", heartBeatRoutes);
 
 const io = new Server(server, {
   cors: {

@@ -116,6 +116,7 @@ class QuestionManager {
     const question = questionPool.questions[questionPool.currentIndex];
     questionPool.currentIndex += 1;
     question.startTime = Date.now();
+    question.endTime = question.startTime + question.timeLimit;
 
     return {
       id: question.id,
@@ -128,6 +129,7 @@ class QuestionManager {
         index: choice.index,
       })),
       startTime: question.startTime,
+      endTime: question.endTime,
     };
   }
 

@@ -106,7 +106,7 @@ class BadgeService {
   static async getAllPlayerBadges(playerId) {
     try {
       const playerBadges = await UserBadge.findAll({
-        where: { playerId: playerId },
+        where: { userId: playerId },
         include: [
           {
             model: Badge,
@@ -157,7 +157,7 @@ class BadgeService {
 
       const [userBadge, created] = await UserBadge.findOrCreate({
         where: {
-          playerId: playerId,
+          userId: playerId,
           badgeId: badgeId,
           eventBossId: badgeType === "achievement" ? eventBossId : null,
           eventId: eventId,

@@ -41,6 +41,7 @@ const handleMatchmaking = (io, socket) => {
           {
             message: "Battle is starting!",
             data: {
+              battleSessionId: data.battleSessionId,
               countdownEndTime: Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN,
             },
           }

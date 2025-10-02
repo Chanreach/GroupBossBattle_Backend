@@ -204,31 +204,47 @@ const logout = async (req, res) => {
 
 const guestLogin = async (req, res) => {
   try {
-    let guestId;
-    let existingUser;
+    let response;
 
-    // Generate a unique ID for the guest user and ensure it doesn't exist
-    do {
-      guestId = uuidv4();
-      existingUser = await User.findOne({
-        where: { id: guestId },
+    const guestId = req.cookies?.guestId;
+    if (guestId) {
+      const existingGuest = await User.findOne({
+        where: { id: guestId, isGuest: true },
       });
-    } while (existingUser);
+      if (existingGuest) {
+        existingGuest.lastActiveAt = new Date();
+        await existingGuest.save();
+        response = existingGuest;
+      }
+    } else {
+      let guestName;
+      let existingUser;
 
-    const guestUsername = generateGuestName();
+      do {
+        guestName = generateGuestName();
+        existingUser = await User.findOne({
+          where: { username: guestName, isGuest: true },
+        });
+      } while (existingUser);
+
+      response = await User.create({
+        username: guestName,
+        isGuest: true,
+        lastActiveAt: new Date(),
+      });
+    }
 
     // Generate tokens for the guest user
     const accessToken = jwt.sign(
-      { id: guestId, username: guestUsername, role: "guest", isGuest: true },
+      { id: response.id, username: response.username, isGuest: true },
       process.env.JWT_SECRET || "secret",
       { expiresIn: "30m" }
     );
 
     const refreshToken = jwt.sign(
       {
-        id: guestId,
-        username: guestUsername,
-        role: "guest",
+        id: response.id,
+        username: response.username,
         type: "refresh",
         isGuest: true,
       },
@@ -244,13 +260,19 @@ const guestLogin = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
+    res.cookie("guestId", response.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
     res.json({
       message: "Guest login successful",
       token: accessToken,
       user: {
-        id: guestId,
-        username: guestUsername,
-        role: "guest",
+        id: response.id,
+        username: response.username,
         isGuest: true,
       },
     });

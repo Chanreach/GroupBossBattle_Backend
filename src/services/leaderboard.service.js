@@ -1,13 +1,13 @@
 import {
   Leaderboard,
   User,
-  EventBoss,
 } from "../models/index.js";
-import { Op, fn, col, literal } from "sequelize";
+import { fn, col, literal } from "sequelize";
 
 class LeaderboardService {
   static async updateLeaderboardEntry(
-    playerId,
+    userId,
+    eventId,
     eventBossId,
     totalDamage = 0,
     correctAnswers = 0,
@@ -16,7 +16,8 @@ class LeaderboardService {
     try {
       const [leaderboardEntry, created] = await Leaderboard.findOrCreate({
         where: {
-          playerId,
+          userId,
+          eventId,
           eventBossId,
         },
         defaults: {
@@ -47,11 +48,11 @@ class LeaderboardService {
     }
   }
 
-  static async getPlayerStatsByEventBossId(playerId, eventBossId) {
+  static async getPlayerStatsByEventBossId(userId, eventBossId) {
     try {
       const leaderboardEntry = await Leaderboard.findOne({
         where: {
-          playerId,
+          userId,
           eventBossId,
         },
       });
@@ -62,27 +63,16 @@ class LeaderboardService {
     }
   }
 
-  static async getPlayerStatsByEventId(playerId, eventId) {
+  static async getPlayerStatsByEventId(userId, eventId) {
     try {
-      const eventBosses = await EventBoss.findAll({
-        where: { eventId },
-        attributes: ["id"],
-      });
-
-      const eventBossIds = eventBosses.map((eb) => eb.id);
-      if (eventBossIds.length === 0) {
-        return [];
-      }
-
       const leaderboardEntry = await Leaderboard.findAll({
         where: {
-          playerId,
-          eventBossId: {
-            [Op.in]: eventBossIds,
-          },
+          userId,
+          eventId,
         },
         attributes: [
-          "playerId",
+          "userId",
+          "eventId",
           [fn("SUM", col("total_damage_dealt")), "totalDamageDealt"],
           [fn("SUM", col("total_correct_answers")), "totalCorrectAnswers"],
           [
@@ -94,12 +84,12 @@ class LeaderboardService {
             "totalBattlesParticipated",
           ],
         ],
-        group: ["playerId"],
+        group: ["userId", "eventId"],
       });
 
       return leaderboardEntry[0]
         ? {
-            playerId: leaderboardEntry[0].playerId,
+            userId: leaderboardEntry[0].userId,
             eventId,
             totalDamageDealt: Number(
               leaderboardEntry[0].get("totalDamageDealt")
@@ -128,7 +118,7 @@ class LeaderboardService {
           eventBossId,
         },
         attributes: [
-          "playerId",
+          "userId",
           "eventBossId",
           "totalDamageDealt",
           "totalCorrectAnswers",
@@ -152,29 +142,21 @@ class LeaderboardService {
         leaderboardEntries.map(async (entry) => {
           let username = "Unknown Player";
           let profileImage = null;
-          let userId = null;
           try {
-            const playerSession = await PlayerSession.findByPk(entry.playerId);
-            if (playerSession) {
-              username = playerSession.username;
-              userId = playerSession.userId;
-              if (userId) {
-                const user = await User.findByPk(userId);
-                if (user) {
-                  profileImage = user.profileImage;
-                }
-              }
+            const user = await User.findByPk(entry.userId);
+            if (user) {
+              username = user.username;
+              profileImage = user.profileImage;
             }
           } catch (lookupError) {
             console.warn(
-              `Could not resolve player name for ID ${entry.playerId}`
+              `Could not resolve player name for ID ${entry.userId}`
             );
           }
           return {
-            playerId: entry.playerId,
-            userId,
+            userId: entry.userId,
             eventBossId: entry.eventBossId,
-            playerName: username,
+            username,
             profileImage,
             totalDamageDealt: Number(entry.totalDamageDealt),
             totalCorrectAnswers: Number(entry.totalCorrectAnswers),
@@ -194,22 +176,13 @@ class LeaderboardService {
 
   static async getEventAllTimeLeaderboard(eventId) {
     try {
-      const eventBosses = await EventBoss.findAll({
-        where: { eventId },
-        attributes: ["id"],
-      });
-      const eventBossIds = eventBosses.map((eb) => eb.id);
-      if (eventBossIds.length === 0) {
-        return [];
-      }
       const leaderboardEntries = await Leaderboard.findAll({
         where: {
-          eventBossId: {
-            [Op.in]: eventBossIds,
-          },
+          eventId,
         },
         attributes: [
-          "playerId",
+          "userId",
+          "eventId",
           [fn("SUM", col("total_damage_dealt")), "totalDamageDealt"],
           [fn("SUM", col("total_correct_answers")), "totalCorrectAnswers"],
           [
@@ -230,7 +203,7 @@ class LeaderboardService {
             "accuracy",
           ],
         ],
-        group: ["playerId"],
+        group: ["userId", "eventId"],
         order: [
           ["totalDamageDealt", "DESC"],
           ["accuracy", "DESC"],
@@ -244,27 +217,21 @@ class LeaderboardService {
           let profileImage = null;
           let userId = null;
           try {
-            const playerSession = await PlayerSession.findByPk(entry.playerId);
-            if (playerSession) {
-              username = playerSession.username;
-              userId = playerSession.userId;
-              if (userId) {
-                const user = await User.findByPk(userId);
-                if (user) {
-                  profileImage = user.profileImage;
-                }
-              }
+            const user = await User.findByPk(entry.userId);
+            if (user) {
+              username = user.username;
+              userId = user.id;
+              profileImage = user.profileImage;
             }
           } catch (lookupError) {
             console.warn(
-              `Could not resolve player name for ID ${entry.playerId}`
+              `Could not resolve player name for ID ${entry.userId}`
             );
           }
           return {
-            playerId: entry.playerId,
             userId,
             eventId,
-            playerName: username,
+            username,
             profileImage,
             totalDamageDealt: Number(entry.get("totalDamageDealt")),
             totalCorrectAnswers: Number(entry.get("totalCorrectAnswers")),

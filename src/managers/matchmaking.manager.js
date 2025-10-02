@@ -14,11 +14,12 @@ class MatchmakingManager {
 
   async addPlayerToQueue(eventBossId, playerInfo, socketId) {
     const existingPlayer = this.getPlayerInfo(eventBossId, playerInfo.id);
+    let player = existingPlayer;
     if (!existingPlayer) {
       if (this.isNicknameTaken(eventBossId, playerInfo.nickname)) {
         throw new Error("Nickname is already taken.");
       }
-      const player = {
+      player = {
         id: playerInfo.id,
         username: playerInfo.username,
         nickname: playerInfo.nickname,
@@ -50,8 +51,11 @@ class MatchmakingManager {
           const queueSize = this.getQueueSize(eventBossId);
           this.resetBattleQueue(eventBossId);
 
+          player.contextStatus = GAME_CONSTANTS.PLAYER.CONTEXT_STATUS.IN_BATTLE;
+
           return {
-            playerInfo,
+            battleSessionId: battleSessionManager.getBattleSessionId(eventBossId),
+            player,
             queueSize,
             isBattleStarted: true,
           };
@@ -63,7 +67,7 @@ class MatchmakingManager {
     }
 
     return {
-      playerInfo: this.getPlayerInfo(eventBossId, playerInfo.id),
+      player,
       queueSize: this.getQueueSize(eventBossId),
     };
   }

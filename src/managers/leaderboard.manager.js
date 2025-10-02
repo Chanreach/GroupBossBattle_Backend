@@ -1,4 +1,5 @@
 import LeaderboardService from "../services/leaderboard.service.js";
+import { compareScores } from "../utils/game.utils.js";
 
 class LeaderboardManager {
   constructor() {
@@ -46,6 +47,8 @@ class LeaderboardManager {
         totalResponseTime: 0,
         averageResponseTime: 0,
         accuracy: 0,
+        hearts: 0,
+        revivedCount: 0,
       });
     });
   }
@@ -110,6 +113,8 @@ class LeaderboardManager {
     player.totalResponseTime = playerStats.totalResponseTime;
     player.averageResponseTime = playerStats.averageResponseTime;
     player.accuracy = playerStats.accuracy;
+    player.hearts = playerStats.hearts;
+    player.revivedCount = playerStats.revivedCount;
 
     const team = this.getTeamById(eventBossId, player.teamId);
     team.totalDamage = teamStats.totalDamage;
@@ -135,7 +140,7 @@ class LeaderboardManager {
 
     const eventBossAllTimeLeaderboard = new Map();
     leaderboard.forEach((entry) => {
-      eventBossAllTimeLeaderboard.set(entry.playerId, entry);
+      eventBossAllTimeLeaderboard.set(entry.userId, entry);
     });
     return this.sortLeaderboardByRank(
       this.rankLeaderboard(eventBossAllTimeLeaderboard)
@@ -149,19 +154,25 @@ class LeaderboardManager {
     if (!leaderboard || leaderboard.length === 0) {
       return null;
     }
-    
+
     const eventAllTimeLeaderboard = new Map();
     leaderboard.forEach((entry) => {
-      eventAllTimeLeaderboard.set(entry.playerId, entry);
+      eventAllTimeLeaderboard.set(entry.userId, entry);
     });
     return this.sortLeaderboardByRank(
       this.rankLeaderboard(eventAllTimeLeaderboard)
     );
   }
 
-  async updateEventBossAllTimeLeaderboard(playerId, eventBossId, data) {
+  async updateEventBossAllTimeLeaderboard(
+    playerId,
+    eventId,
+    eventBossId,
+    data
+  ) {
     return await LeaderboardService.updateLeaderboardEntry(
       playerId,
+      eventId,
       eventBossId,
       data.totalDamage,
       data.correctAnswers,
@@ -188,10 +199,21 @@ class LeaderboardManager {
   rankLeaderboard(leaderboard) {
     const leaderboardArray = Array.from(leaderboard.values());
     leaderboardArray.sort((a, b) => {
-      if (b.totalDamage !== a.totalDamage) {
-        return b.totalDamage - a.totalDamage;
-      }
-      return b.correctAnswers - a.correctAnswers;
+      const scoreA = [
+        a.totalDamage || a.totalDamageDealt,
+        a.accuracy,
+        -a.averageResponseTime,
+        a.hearts || 0,
+        a.revivedCount || 0,
+      ];
+      const scoreB = [
+        b.totalDamage || b.totalDamageDealt,
+        b.accuracy,
+        -b.averageResponseTime,
+        b.hearts || 0,
+        b.revivedCount || 0,
+      ];
+      return compareScores(scoreB, scoreA);
     });
 
     let currentRank = 1;
@@ -203,10 +225,23 @@ class LeaderboardManager {
       const prev = leaderboardArray[i - 1];
       const curr = leaderboardArray[i];
 
-      if (
-        curr.totalDamage === prev.totalDamage &&
-        curr.correctAnswers === prev.correctAnswers
-      ) {
+      const prevScore = [
+        prev.totalDamage || prev.totalDamageDealt,
+        prev.accuracy,
+        -prev.averageResponseTime,
+        prev.hearts || 0,
+        prev.revivedCount || 0,
+      ];
+
+      const currScore = [
+        curr.totalDamage || curr.totalDamageDealt,
+        curr.accuracy,
+        -curr.averageResponseTime,
+        curr.hearts || 0,
+        curr.revivedCount || 0,
+      ];
+
+      if (compareScores(currScore, prevScore) === 0) {
         curr.rank = currentRank;
         skipCount++;
       } else {
