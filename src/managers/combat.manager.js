@@ -7,16 +7,10 @@ import {
 
 class CombatManager {
   initializeTeamStats(combatState, teamId) {
-    if (combatState.teamStats.has(teamId)) {
-      return;
-    }
     combatState.teamStats.set(teamId, initializeTeamStats());
   }
 
   initializePlayerStats(combatState, playerId) {
-    if (combatState.playerStats.has(playerId)) {
-      return;
-    }
     combatState.playerStats.set(playerId, initializePlayerStats());
   }
 
@@ -32,6 +26,10 @@ class CombatManager {
   ) {
     const playerStats = this.getPlayerStats(combatState, playerId);
     const teamStats = this.getTeamStats(combatState, teamId);
+    if (!playerStats || !teamStats) {
+      return null;
+    }
+    
     const { damage, responseCategory } = calculateDamage(
       isCorrect,
       responseTime,
@@ -39,11 +37,16 @@ class CombatManager {
     );
 
     if (damage > 0) {
-      this.applyDamage(eventBoss, damage);
+      const remainingHP = this.applyDamage(eventBoss, damage);
+      if (remainingHP === null) {
+        console.error("Failed to apply damage to event boss");
+        return null;
+      }
+
       playerStats.totalDamage += damage;
       teamStats.totalDamage += damage;
 
-      if (eventBoss.currentHP <= 0) {
+      if (remainingHP <= 0) {
         achievementAwards.lastHit = playerId;
       }
     }
@@ -57,7 +60,12 @@ class CombatManager {
     } else {
       playerStats.incorrectAnswers += 1;
       teamStats.incorrectAnswers += 1;
-      this.deductPlayerHearts(combatState, playerId);
+      
+      const remainingHearts = this.deductPlayerHearts(combatState, playerId);
+      if (remainingHearts === null) {
+        console.error("Failed to deduct player hearts");
+        return null;
+      }
     }
 
     playerStats.questionsAnswered += 1;
@@ -83,6 +91,9 @@ class CombatManager {
   processQuestionTimeout(combatState, eventBoss, playerId, teamId) {
     const playerStats = this.getPlayerStats(combatState, playerId);
     const teamStats = this.getTeamStats(combatState, teamId);
+    if (!playerStats || !teamStats) {
+      return null;
+    }
 
     playerStats.incorrectAnswers += 1;
     teamStats.incorrectAnswers += 1;
@@ -90,52 +101,60 @@ class CombatManager {
     playerStats.questionsAnswered += 1;
     teamStats.questionsAnswered += 1;
 
-    this.deductPlayerHearts(combatState, playerId);
+    const remainingHearts = this.deductPlayerHearts(combatState, playerId);
+    if (remainingHearts === null) {
+      console.error("Failed to deduct player hearts");
+      return null;
+    }
 
     return {
       isCorrect: false,
       damage: 0,
       responseCategory: "TIMEOUT",
-      playerHearts: playerStats.hearts,
+      playerHearts: remainingHearts,
       eventBossCurrentHP: eventBoss.currentHP,
     };
   }
 
   applyDamage(eventBoss, damage) {
+    if (!eventBoss) {
+      console.error("Event boss not found");
+      return null;
+    }
+
     eventBoss.currentHP = Math.max(0, eventBoss.currentHP - damage);
     return eventBoss.currentHP;
   }
 
   deductPlayerHearts(combatState, playerId) {
     const playerStats = this.getPlayerStats(combatState, playerId);
+    if (!playerStats) {
+      return null;
+    }
+
     playerStats.hearts = Math.max(0, playerStats.hearts - 1);
     return playerStats.hearts;
   }
 
-  getCombatState(battleSession) {
-    if (!battleSession.combat) {
-      throw new Error("Combat session not found");
-    }
-    return battleSession.combat;
-  }
-
   getPlayerStats(combatState, playerId) {
     if (!combatState.playerStats.has(playerId)) {
-      throw new Error(`Player with ID ${playerId} not found in combat session`);
+      console.error(`Player with ID ${playerId} not found in combat session`);
+      return null;
     }
     return combatState.playerStats.get(playerId);
   }
 
   getTeamStats(combatState, teamId) {
     if (!combatState.teamStats.has(teamId)) {
-      throw new Error(`Team with ID ${teamId} not found in combat session`);
+      console.error(`Team with ID ${teamId} not found in combat session`);
+      return null;
     }
     return combatState.teamStats.get(teamId);
   }
 
   getPlayerHearts(combatState, playerId) {
     const playerStats = this.getPlayerStats(combatState, playerId);
-    return playerStats.hearts;
+    return playerStats?.hearts ?? 0;
   }
 
   restorePlayerHearts(combatState, playerId) {

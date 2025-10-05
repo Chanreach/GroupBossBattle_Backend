@@ -1,30 +1,40 @@
-import {
-  SOCKET_EVENTS,
-  SOCKET_ERRORS,
-  SOCKET_MESSAGES,
-  SOCKET_ROOMS,
-} from "../../utils/socket.constants.js";
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
 import battleSessionManager from "../../managers/battle-session.manager.js";
 import { GAME_CONSTANTS } from "../../utils/game.constants.js";
 
 const handleBattleSession = (io, socket) => {
   socket.on(SOCKET_EVENTS.BATTLE_SESSION.JOIN, async (payload) => {
     const { eventBossId, joinCode, playerId } = payload;
+
     if (!eventBossId || !joinCode || !playerId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INVALID_PAYLOAD,
         message: "Invalid eventBossId, joinCode, or playerId.",
       });
       return;
     }
 
     try {
+      const battleSession = battleSessionManager.getBattleSession(eventBossId);
+      if (!battleSession) {
+        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.NOT_FOUND, {
+          message:
+            "Battle session not found. The battle may have ended or not started yet.",
+        });
+        return;
+      }
+
       const eventBoss = battleSessionManager.getEventBoss(eventBossId);
-      const player = battleSessionManager.getPlayerFromBattleSession(
+      if (!eventBoss) {
+        socket.emit(SOCKET_EVENTS.BOSS.NOT_FOUND, {
+          message: "Event boss not found.",
+        });
+        return;
+      }
+
+      const player = battleSessionManager.reconnectPlayerToBattleSession(
         eventBossId,
         playerId
       );
-
       if (!player) {
         socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.NOT_FOUND, {
           message: "Player not found in this battle session.",
@@ -39,39 +49,64 @@ const handleBattleSession = (io, socket) => {
       socket.join(SOCKET_ROOMS.BATTLE_SESSION(eventBossId));
       socket.join(SOCKET_ROOMS.TEAM(eventBossId, teamId));
 
-      const playerHearts = battleSessionManager.getPlayerHearts(
+      const currentQuestion = battleSessionManager.getCurrentQuestionForPlayer(
         eventBossId,
         playerId
       );
-      const playerBattleState = battleSessionManager.getPlayerBattleState(
-        eventBossId,
-        playerId
-      );
-      if (
-        playerBattleState === GAME_CONSTANTS.PLAYER.BATTLE_STATE.KNOCKED_OUT
-      ) {
-        const knockoutInfo = battleSessionManager.getKnockedOutPlayerInfo(
+      const currentQuestionNumber =
+        battleSessionManager.getCurrentQuestionNumberForPlayer(
           eventBossId,
           playerId
         );
-        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.KNOCKED_OUT, {
-          message: "You have been knocked out!",
-          data: knockoutInfo,
-        });
-        return;
-      }
+      const questionEndTime = currentQuestion?.endTime ?? null;
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.JOINED, {
-        status: "success",
         message: `You are in team ${teamName}`,
         data: {
           eventBoss,
           player: {
             ...player,
-            hearts: playerHearts,
+            hearts: battleSessionManager.getPlayerHearts(eventBossId, playerId),
             teamName,
+          },
+          question: {
+            currentQuestion,
+            currentQuestionNumber,
+            questionEndTime,
           },
         },
       });
+
+      if (battleSessionManager.isEventBossDefeated(eventBossId)) {
+        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.ENDED, {
+          message: "The event boss has been defeated.",
+          data: {
+            podiumEndTime: battleSession.podiumEndTime,
+          },
+        });
+        return;
+      }
+
+      const playerState = battleSessionManager.getPlayerBattleState(
+        eventBossId,
+        playerId
+      );
+      if (playerState === GAME_CONSTANTS.PLAYER.BATTLE_STATE.KNOCKED_OUT) {
+        const knockoutInfo = battleSessionManager.getKnockedOutPlayerInfo(
+          eventBossId,
+          playerId
+        );
+        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.KNOCKED_OUT, {
+          message:
+            "You have been knocked out! Share your revival code with teammates.",
+          data: { knockoutInfo },
+        });
+        return;
+      } else if (playerState === GAME_CONSTANTS.PLAYER.BATTLE_STATE.DEAD) {
+        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.DEAD, {
+          message: "You are out of the battle.",
+        });
+        return;
+      }
 
       socket.broadcast
         .to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId))
@@ -121,20 +156,6 @@ const handleBattleSession = (io, socket) => {
         );
       }
 
-      if (battleSessionManager.isEventBossDefeated(eventBossId)) {
-        io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
-          SOCKET_EVENTS.BATTLE_SESSION.ENDED,
-          {
-            message: "The event boss has been defeated!",
-            data: {
-              podiumEndTime:
-                battleSessionManager.getBattleSession(eventBossId)
-                  .podiumEndTime,
-            },
-          }
-        );
-      }
-
       const knockedOutPlayers = battleSessionManager.getKnockedOutPlayersByTeam(
         eventBossId,
         teamId
@@ -159,14 +180,14 @@ const handleBattleSession = (io, socket) => {
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        error: SOCKET_ERRORS.INTERNAL_SERVER,
-        message: SOCKET_MESSAGES.INTERNAL_SERVER_ERROR,
+        message: error.message || "Internal server error.",
       });
     }
   });
 
   socket.on(SOCKET_EVENTS.BATTLE_SESSION.LEAVE, (payload) => {
     const { eventBossId, playerId } = payload;
+
     if (!eventBossId || !playerId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId or playerId.",
@@ -174,18 +195,18 @@ const handleBattleSession = (io, socket) => {
       return;
     }
 
-    if (
-      !battleSessionManager.getPlayerFromBattleSession(eventBossId, playerId)
-    ) {
+    const player = battleSessionManager.disconnectPlayerFromBattleSession(
+      eventBossId,
+      playerId
+    );
+    if (!player) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.NOT_FOUND,
-        message: SOCKET_MESSAGES.NOT_FOUND_ERROR,
+        message: "You are not part of this battle session.",
       });
       return;
     }
 
     socket.leave(SOCKET_ROOMS.BATTLE_SESSION(eventBossId));
-
     socket.emit(SOCKET_EVENTS.BATTLE_SESSION.LEFT, {
       message: "You have left the battle session.",
     });
@@ -202,7 +223,9 @@ const handleBattleSession = (io, socket) => {
     );
   });
 
-  socket.on(SOCKET_EVENTS.BATTLE_SESSION.SIZE.REQUEST, (eventBossId) => {
+  socket.on(SOCKET_EVENTS.BATTLE_SESSION.SIZE.REQUEST, (payload) => {
+    const { eventBossId } = payload;
+
     if (!eventBossId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId.",
@@ -211,7 +234,8 @@ const handleBattleSession = (io, socket) => {
     }
 
     try {
-      const eventBossStatus = battleSessionManager.getEventBossStatus(eventBossId);
+      const eventBossStatus =
+        battleSessionManager.getEventBossStatus(eventBossId);
       let sessionSize = 0;
       if (eventBossStatus && eventBossStatus === "in-battle") {
         sessionSize = battleSessionManager.getBattleSessionSize(eventBossId);
@@ -222,13 +246,14 @@ const handleBattleSession = (io, socket) => {
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INTERNAL_SERVER,
-        message: "An error occurred while fetching the session size.",
+        message: error.message || "Internal server error.",
       });
     }
   });
 
-  socket.on(SOCKET_EVENTS.BATTLE_SESSION.REQUEST, (eventBossId) => {
+  socket.on(SOCKET_EVENTS.BATTLE_SESSION.REQUEST, (payload) => {
+    const { eventBossId } = payload;
+
     if (!eventBossId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId.",
@@ -237,26 +262,25 @@ const handleBattleSession = (io, socket) => {
     }
 
     try {
-      const session = battleSessionManager.findBattleSession(eventBossId);
-
-      let sessionSize = 0;
-      if (session && session.status !== "ended") {
-        sessionSize = battleSessionManager.getBattleSessionSize(eventBossId);
-      }
+      let session = battleSessionManager.getBattleSession(eventBossId);
+      session =
+        session?.state === GAME_CONSTANTS.BATTLE_STATE.ENDED ? null : session;
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.RESPONSE, {
-        data: { session, sessionSize },
+        data: {
+          session,
+        },
       });
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INTERNAL_SERVER,
-        message: "An error occurred while fetching the session size.",
+        message: error.message || "Internal server error.",
       });
     }
   });
 
   socket.on(SOCKET_EVENTS.BATTLE_SESSION.MID_GAME.JOIN, async (payload) => {
     const { eventBossId, playerInfo } = payload;
+
     if (!eventBossId || !playerInfo) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId or playerInfo.",
@@ -265,9 +289,9 @@ const handleBattleSession = (io, socket) => {
     }
 
     try {
-      if (!battleSessionManager.hasBattleSession(eventBossId)) {
-        socket.emit(SOCKET_EVENTS.ERROR, {
-          code: SOCKET_ERRORS.NOT_FOUND,
+      const battleSession = battleSessionManager.getBattleSession(eventBossId);
+      if (!battleSession) {
+        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.NOT_FOUND, {
           message:
             "Battle session not found. The battle may have ended or not started yet.",
         });
@@ -276,9 +300,31 @@ const handleBattleSession = (io, socket) => {
 
       if (!battleSessionManager.canJoinMidGame(eventBossId)) {
         socket.emit(SOCKET_EVENTS.ERROR, {
-          code: SOCKET_ERRORS.NOT_FOUND,
           message:
             "Cannot join this battle. The battle may have ended or not started yet.",
+        });
+        return;
+      }
+
+      const existingPlayer = battleSessionManager.getPlayerFromBattleSession(
+        eventBossId,
+        playerInfo.id
+      );
+      if (
+        existingPlayer &&
+        existingPlayer.battleState !== GAME_CONSTANTS.PLAYER.BATTLE_STATE.DEAD
+      ) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "You are already in this battle session.",
+        });
+        return;
+      }
+
+      if (
+        battleSessionManager.isNicknameTaken(eventBossId, playerInfo.nickname)
+      ) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Nickname is already taken in this battle session.",
         });
         return;
       }
@@ -297,13 +343,20 @@ const handleBattleSession = (io, socket) => {
         eventBossId,
         player
       );
+      if (!response) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Failed to join the battle session.",
+        });
+        return;
+      }
+
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.MID_GAME.JOINED, {
-        status: "success",
         message: "Successfully joined mid-game.",
         data: {
           playerInfo: response.player,
         },
       });
+
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.COUNTDOWN, {
         message: "Battle is starting!",
         data: {
@@ -311,6 +364,7 @@ const handleBattleSession = (io, socket) => {
           countdownEndTime: Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN,
         },
       });
+
       io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
         SOCKET_EVENTS.BATTLE_SESSION.SIZE.UPDATED,
         {
@@ -319,6 +373,7 @@ const handleBattleSession = (io, socket) => {
           },
         }
       );
+
       battleSessionManager.addPlayerToLeaderboard(eventBossId, player.id);
 
       io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
@@ -333,67 +388,7 @@ const handleBattleSession = (io, socket) => {
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INTERNAL_SERVER,
-        message: "An error occurred while joining mid-game.",
-      });
-    }
-  });
-
-  socket.on(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.RECONNECT, (payload) => {
-    const { eventBossId, playerId } = payload;
-    if (!eventBossId || !playerId) {
-      socket.emit(SOCKET_EVENTS.ERROR, {
-        message: "Invalid eventBossId or playerId.",
-      });
-      return;
-    }
-
-    try {
-      const player = battleSessionManager.reconnectPlayerToBattleSession(
-        eventBossId,
-        playerId,
-        socket.id
-      );
-      if (!player) {
-        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.RECONNECT_FAILED, {
-          message: "Reconnection failed. Player not found in session.",
-        });
-        return;
-      }
-      socket.join(SOCKET_ROOMS.BATTLE_SESSION(eventBossId));
-      const { teamId } = battleSessionManager.getPlayerTeamInfo(
-        eventBossId,
-        playerId
-      );
-      socket.join(SOCKET_ROOMS.TEAM(eventBossId, teamId));
-      const currentQuestion = battleSessionManager.getCurrentQuestionForPlayer(
-        eventBossId,
-        playerId
-      );
-      const data = currentQuestion
-        ? {
-            currentQuestion,
-            currentQuestionNumber:
-              battleSessionManager.getCurrentQuestionNumberForPlayer(
-                eventBossId,
-                playerId
-              ),
-            questionEndTime: currentQuestion.endTime,
-          }
-        : {
-            currentQuestion: null,
-            currentQuestionNumber: 0,
-            questionEndTime: null,
-          };
-      socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.RECONNECTED, {
-        message: `Reconnected to battle session.`,
-        data,
-      });
-    } catch (error) {
-      console.log(error);
-      socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INTERNAL_SERVER,
-        message: "An error occurred while reconnecting to the battle session.",
+        message: "Internal server error.",
       });
     }
   });

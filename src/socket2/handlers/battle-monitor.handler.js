@@ -1,7 +1,5 @@
 import {
   SOCKET_EVENTS,
-  SOCKET_ERRORS,
-  SOCKET_MESSAGES,
   SOCKET_ROOMS,
 } from "../../utils/socket.constants.js";
 import battleSessionManager from "../../managers/battle-session.manager.js";
@@ -35,7 +33,7 @@ const handleBattleMonitor = (io, socket) => {
 
       socket.join(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId));
 
-      const battleSession = battleSessionManager.findBattleSession(eventBossId);
+      const battleSession = battleSessionManager.getBattleSession(eventBossId);
       let eventBoss = null;
       let battleState = null;
       let activePlayers = 0;

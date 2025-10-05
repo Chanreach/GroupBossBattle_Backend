@@ -12,7 +12,6 @@ class LeaderboardManager {
       this.teamLeaderboards.set(eventBossId, new Map());
     }
     const teamLeaderboard = this.teamLeaderboards.get(eventBossId);
-
     teams.forEach((team) => {
       teamLeaderboard.set(team.id, {
         id: team.id,
@@ -55,9 +54,13 @@ class LeaderboardManager {
 
   addPlayerToLeaderboard(eventBossId, player) {
     const individualLeaderboard = this.individualLeaderboards.get(eventBossId);
-    if (individualLeaderboard.has(player.id)) {
+    if (!individualLeaderboard) {
+      console.error(
+        `No individual leaderboard found for event boss ${eventBossId}`
+      );
       return;
     }
+
     individualLeaderboard.set(player.id, {
       id: player.id,
       nickname: player.nickname,
@@ -79,6 +82,13 @@ class LeaderboardManager {
       this.getIndividualLeaderboard(eventBossId)
     );
 
+    if (!teamLeaderboard || !individualLeaderboard) {
+      console.error(
+        `Incomplete leaderboard data for event boss ${eventBossId}`
+      );
+      return null;
+    }
+
     return teamLeaderboard.map((team) => ({
       ...team,
       players: individualLeaderboard
@@ -97,6 +107,7 @@ class LeaderboardManager {
     const allTimeLeaderboard = await this.getEventBossAllTimeLeaderboard(
       eventBossId
     );
+
     return {
       teamLeaderboard,
       individualLeaderboard,
@@ -106,6 +117,8 @@ class LeaderboardManager {
 
   updateLiveLeaderboard(eventBossId, playerId, playerStats, teamStats) {
     const player = this.getPlayerById(eventBossId, playerId);
+    if (!player) return;
+
     player.totalDamage = playerStats.totalDamage;
     player.correctAnswers = playerStats.correctAnswers;
     player.incorrectAnswers = playerStats.incorrectAnswers;
@@ -117,6 +130,8 @@ class LeaderboardManager {
     player.revivedCount = playerStats.revivedCount;
 
     const team = this.getTeamById(eventBossId, player.teamId);
+    if (!team) return;
+
     team.totalDamage = teamStats.totalDamage;
     team.correctAnswers = teamStats.correctAnswers;
     team.incorrectAnswers = teamStats.incorrectAnswers;
@@ -261,9 +276,10 @@ class LeaderboardManager {
   getTeamById(eventBossId, teamId) {
     const teamLeaderboard = this.getTeamLeaderboard(eventBossId);
     if (!teamLeaderboard.has(teamId)) {
-      throw new Error(
+      console.error(
         `Team with ID ${teamId} not found in leaderboard for event boss ${eventBossId}`
       );
+      return null;
     }
     return teamLeaderboard.get(teamId);
   }
@@ -271,9 +287,10 @@ class LeaderboardManager {
   getPlayerById(eventBossId, playerId) {
     const individualLeaderboard = this.getIndividualLeaderboard(eventBossId);
     if (!individualLeaderboard.has(playerId)) {
-      throw new Error(
+      console.error(
         `Player with ID ${playerId} not found in leaderboard for event boss ${eventBossId}`
       );
+      return null;
     }
     return individualLeaderboard.get(playerId);
   }
@@ -289,4 +306,5 @@ class LeaderboardManager {
   }
 }
 
-export default LeaderboardManager;
+const leaderboardManager = new LeaderboardManager();
+export default leaderboardManager;

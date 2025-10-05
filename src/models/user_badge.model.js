@@ -25,16 +25,6 @@ const UserBadge = sequelize.define(
       type: DataTypes.UUID,
       allowNull: false,
     },
-    earnCount: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 1,
-    },
-    lastEarnedAt: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
-    }
   },
   {
     tableName: "user_badges",

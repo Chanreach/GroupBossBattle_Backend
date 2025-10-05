@@ -1,14 +1,14 @@
 import {
   SOCKET_EVENTS,
-  SOCKET_ERRORS,
-  SOCKET_MESSAGES,
   SOCKET_ROOMS,
+  SOCKET_MESSAGES,
 } from "../../utils/socket.constants.js";
 import battleSessionManager from "../../managers/battle-session.manager.js";
 
 const handleLeaderboard = (io, socket) => {
   socket.on(SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.REQUEST, async (payload) => {
     const { eventBossId } = payload;
+
     if (!eventBossId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId.",
@@ -26,14 +26,14 @@ const handleLeaderboard = (io, socket) => {
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INTERNAL_SERVER,
-        message: "An error occurred while fetching the leaderboard.",
+        message: error.message || "Internal server error.",
       });
     }
   });
 
   socket.on(SOCKET_EVENTS.BATTLE_SESSION.LEADERBOARD.REQUEST, (payload) => {
     const { eventBossId } = payload;
+
     if (!eventBossId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId.",
@@ -50,14 +50,14 @@ const handleLeaderboard = (io, socket) => {
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INTERNAL_SERVER,
-        message: "An error occurred while fetching the leaderboard.",
+        message: error.message || "Internal server error.",
       });
     }
   });
 
   socket.on(SOCKET_EVENTS.PODIUM.JOIN, (payload) => {
     const { eventBossId, playerId } = payload;
+
     if (!eventBossId || !playerId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId or playerId.",
@@ -86,6 +86,8 @@ const handleLeaderboard = (io, socket) => {
     socket.emit(SOCKET_EVENTS.PODIUM.JOINED, {
       data: { eventBoss, battleState },
     });
+
+    if (!battleState) return;
 
     const playerBadges = battleSessionManager.getPlayerBadgesFromBattleSession(
       eventBossId,

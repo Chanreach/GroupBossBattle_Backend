@@ -167,7 +167,7 @@ class TeamNameGenerator {
 
     for (let i = 0; i < numberOfTeams; i++) {
       const newName = this.generateTeamName(teamNames, {
-        seed: seed, // Offset seed for variety
+        seed,
         usedAnimals,
         adjectiveUsage,
       });

@@ -7,7 +7,6 @@ export const activityTracker = async (req, res, next) => {
         { lastActiveAt: new Date() },
         { where: { id: req.user.id } }
       );
-      console.log(`Updated lastActiveAt for user ID: ${req.user.id}`);
       return next();
     }
 
@@ -24,7 +23,6 @@ export const activityTracker = async (req, res, next) => {
         { lastActiveAt: new Date() },
         { where: { id: guestId } }
       );
-      console.log(`Updated lastActiveAt for guest user ID: ${guestId}`);
       return next();
     }
 

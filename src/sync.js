@@ -11,6 +11,7 @@ const syncDatabase = async () => {
   } catch (error) {
     console.error("Error synchronizing the database:", error);
   }
-}
+  process.exit(0);
+};
 
 syncDatabase();

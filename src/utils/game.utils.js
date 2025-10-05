@@ -106,7 +106,8 @@ export const generateUniqueRevivalCode = (
     }
   }
 
-  throw new Error("Unable to generate a unique revival code");
+  console.error("Unable to generate a unique revival code");
+  return null;
 };
 
 export const generateBattleSessionId = (eventBossId) => {

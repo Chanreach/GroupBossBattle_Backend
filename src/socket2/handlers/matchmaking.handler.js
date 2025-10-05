@@ -1,9 +1,4 @@
-import {
-  SOCKET_EVENTS,
-  SOCKET_ROOMS,
-  SOCKET_ERRORS,
-  SOCKET_MESSAGES,
-} from "../../utils/socket.constants.js";
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
 import { GAME_CONSTANTS } from "../../utils/game.constants.js";
 import matchmakingManager from "../../managers/matchmaking.manager.js";
 import battleSessionManager from "../../managers/battle-session.manager.js";
@@ -14,21 +9,34 @@ const handleMatchmaking = (io, socket) => {
 
     if (!eventBossId || !playerInfo) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INVALID_PAYLOAD,
         message: "Invalid eventBossId or playerInfo.",
       });
       return;
     }
 
     try {
+      if (matchmakingManager.isNicknameTaken(eventBossId, playerInfo.nickname)) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Nickname is already taken.",
+        });
+        return;
+      }
+      
       const data = await matchmakingManager.addPlayerToQueue(
         eventBossId,
         playerInfo,
         socket.id
       );
+      if (!data) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Failed to join the battle queue.",
+        });
+        return;
+      }
+
       socket.join(SOCKET_ROOMS.BATTLE_QUEUE(eventBossId));
       socket.emit(SOCKET_EVENTS.BATTLE_QUEUE.JOINED, {
-        message: SOCKET_MESSAGES.BATTLE_QUEUE.JOINED,
+        message: "Successfully joined the battle queue.",
         data,
       });
       socket.broadcast
@@ -46,6 +54,7 @@ const handleMatchmaking = (io, socket) => {
             },
           }
         );
+
         io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
           SOCKET_EVENTS.BOSS_STATUS.UPDATED,
           {
@@ -54,6 +63,7 @@ const handleMatchmaking = (io, socket) => {
             },
           }
         );
+
         io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
           SOCKET_EVENTS.BATTLE_SESSION.SIZE.UPDATED,
           {
@@ -63,6 +73,7 @@ const handleMatchmaking = (io, socket) => {
             },
           }
         );
+
         io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
           SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.UPDATED,
           {
@@ -72,6 +83,7 @@ const handleMatchmaking = (io, socket) => {
             },
           }
         );
+
         io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
           SOCKET_EVENTS.BATTLE_SESSION.START,
           {
@@ -90,17 +102,16 @@ const handleMatchmaking = (io, socket) => {
       }
     } catch (error) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.MATCHMAKING_ERROR,
-        message: error.message,
+        message: error.message || "Internal server error.",
       });
     }
   });
 
   socket.on(SOCKET_EVENTS.BATTLE_QUEUE.LEAVE, (payload) => {
     const { eventBossId, playerId } = payload;
+
     if (!eventBossId || !playerId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INVALID_PAYLOAD,
         message: "Invalid eventBossId or playerId.",
       });
       return;
@@ -111,6 +122,13 @@ const handleMatchmaking = (io, socket) => {
         eventBossId,
         playerId
       );
+      if (!data) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Failed to leave the battle queue.",
+        });
+        return;
+      }
+
       socket.leave(SOCKET_ROOMS.BATTLE_QUEUE(eventBossId));
       socket.emit(SOCKET_EVENTS.BATTLE_QUEUE.LEFT, {
         message: SOCKET_MESSAGES.BATTLE_QUEUE.LEFT,
@@ -121,31 +139,30 @@ const handleMatchmaking = (io, socket) => {
         .emit(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.UPDATED, { data });
     } catch (error) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.MATCHMAKING_ERROR,
-        message: error.message,
+        message: error.message || "Internal server error.",
       });
     }
   });
 
-  socket.on(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.REQUEST, (eventBossId) => {
+  socket.on(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.REQUEST, (payload) => {
+    const { eventBossId } = payload;
+
     if (!eventBossId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INVALID_PAYLOAD,
         message: "Invalid eventBossId.",
       });
       return;
     }
 
     try {
-      const data = matchmakingManager.getQueueSize(eventBossId);
+      const queueSize = matchmakingManager.getQueueSize(eventBossId);
       socket.emit(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.RESPONSE, {
-        message: SOCKET_MESSAGES.BATTLE_QUEUE.JOINED,
-        data,
+        message: "Successfully fetched queue size.",
+        data: { queueSize },
       });
     } catch (error) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.MATCHMAKING_ERROR,
-        message: error.message,
+        message: error.message || "Internal server error.",
       });
     }
   });

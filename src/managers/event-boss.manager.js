@@ -3,13 +3,16 @@ import { calculateBossHP } from "../utils/game.utils.js";
 
 class EventBossManager {
   async initializeEventBoss(battleSession, eventBossId) {
-    if (!eventBossId) {
-      throw new Error("Event boss ID is required");
+    if (!battleSession || !eventBossId) {
+      console.error("Battle session or event boss ID is missing");
+      return null;
     }
-    const response = await EventBossService.getEventBossById(eventBossId);
+
+    const response = await EventBossService.getEventBossAndEventById(eventBossId);
     if (!response) {
       return null;
     }
+    
     battleSession.eventBoss = {
       ...response.eventBoss,
       maxHP: 0,
@@ -20,8 +23,9 @@ class EventBossManager {
   }
 
   updateEventBossHP(eventBoss, numberOfPlayers) {
-    if (!eventBoss) {
-      return;
+    if (!eventBoss || !numberOfPlayers || numberOfPlayers <= 0) {
+      console.error("Event boss or number of players is invalid");
+      return null;
     }
 
     const newMaxHP = calculateBossHP(numberOfPlayers, eventBoss.numberOfTeams);
@@ -29,24 +33,28 @@ class EventBossManager {
       eventBoss.currentHP += newMaxHP - eventBoss.maxHP;
       eventBoss.maxHP = newMaxHP;
     }
+    return eventBoss;
   }
 
   async updateEventBossStatus(eventBoss, status) {
     if (!eventBoss || !status) {
-      throw new Error("Event boss or status not found");
+      console.error("Event boss or status not found");
+      return null;
     }
+
     const updatedEventBoss = await EventBossService.updateEventBossStatus(
       eventBoss.id,
       status
     );
-    eventBoss.status = updatedEventBoss.status;
-    eventBoss.cooldownEndTime = updatedEventBoss.cooldownEndTime;
+    eventBoss.status = updatedEventBoss?.status ?? eventBoss.status;
+    eventBoss.cooldownEndTime = updatedEventBoss?.cooldownEndTime ?? eventBoss.cooldownEndTime;
     return updatedEventBoss;
   }
 
   isEventBossDefeated(eventBoss) {
     if (!eventBoss) {
-      throw new Error("Event boss not found");
+      console.error("Event boss not found");
+      return null;
     }
     return eventBoss.currentHP <= 0;
   }

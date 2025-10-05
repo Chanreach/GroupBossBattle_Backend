@@ -9,8 +9,6 @@ const handleGuestActivity = (io, socket) => {
     );
   }
 
-  console.log(`Socket connected for guest user ID: ${guestId}`);
-
   socket.on("heartbeat", async () => {
     if (guestId) {
       try {

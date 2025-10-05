@@ -5,13 +5,21 @@ import { GAME_CONSTANTS } from "../utils/game.constants.js";
 
 class QuestionManager {
   async initializeQuestionBank(questionBank, eventBossId) {
+    if (!questionBank || !eventBossId) {
+      console.error("Question bank or event boss ID is missing");
+      return null;
+    }
+
     const questions = await QuestionService.getQuestionsByEventBossId(
       eventBossId
     );
     if (!questions || questions.length === 0) {
+      console.error("No questions found for the given event boss ID");
       return null;
     }
+
     questionBank.push(...questions);
+    return questions;
   }
 
   prepareQuestionPoolForPlayer(questions, battleSessionId, playerId) {
@@ -30,17 +38,25 @@ class QuestionManager {
       playerId,
       seed
     );
+    if (!processedQuestions || processedQuestions.length === 0) {
+      console.error(
+        `No processed questions available for player ${playerId}`
+      );
+      return null;
+    }
 
     questions.pools.set(playerId, {
       questions: processedQuestions,
       currentIndex: 0,
       loopCount: 0,
     });
+    return questions.pools.get(playerId);
   }
 
   prepareQuestionsForPlayer(questionBank, battleSessionId, playerId, seed) {
     if (!questionBank || questionBank.length === 0) {
-      throw new Error("No questions available in the question bank.");
+      console.error("No questions available in the question bank.");
+      return [];
     }
 
     const questionRng = new RandomGenerator(seed);
@@ -87,12 +103,14 @@ class QuestionManager {
 
   getNextQuestion(questions, battleSessionId, playerId) {
     if (!questions.pools.has(playerId)) {
-      throw new Error(`No question pool found for player ${playerId}`);
+      console.error(`No question pool found for player ${playerId}`);
+      return null;
     }
 
     const questionPool = questions.pools.get(playerId);
     if (!questionPool || questionPool.questions.length === 0) {
-      throw new Error(`No questions available for player ${playerId}`);
+      console.error(`No questions available for player ${playerId}`);
+      return null;
     }
 
     if (questionPool.currentIndex >= questionPool.questions.length) {
@@ -172,24 +190,19 @@ class QuestionManager {
 
   getCurrentQuestion(questionPool) {
     if (!questionPool || questionPool.questions.length === 0) {
-      throw new Error("No questions available");
+      console.error("No questions available");
+      return null;
     }
     return questionPool.questions[questionPool.currentIndex - 1];
   }
 
   validatePlayerAnswer(question, choiceIndex) {
     if (!question) {
-      throw new Error("No question provided");
+      console.error("No question provided");
+      return null;
     }
     return question.correctAnswerIndex === choiceIndex;
   }
-
-  clearQuestionPool() {
-    this.questionBanks = [];
-    this.questionPools.clear();
-  }
-
-  validateQuestionStructure(question) {}
 }
 
 export default QuestionManager;

@@ -5,6 +5,11 @@ import TeamNameGenerator from "../utils/team-name-generator.js";
 
 class TeamManager {
   createTeams(teams, battleSessionId, eventBossId, numberOfTeams) {
+    if (!teams || !battleSessionId || !eventBossId || !numberOfTeams) {
+      console.error("Missing parameters to create teams");
+      return null;
+    }
+
     const teamNames = TeamNameGenerator.generateUniqueTeamNames(numberOfTeams, [
       battleSessionId,
       eventBossId,
@@ -19,6 +24,7 @@ class TeamManager {
         players: new Set(),
       });
     }
+    return this.getAllTeams(teams);
   }
 
   getAllTeams(teams) {
@@ -28,7 +34,8 @@ class TeamManager {
   assignPlayerToTeam(teams, battleSessionId, playerId) {
     const teamArray = this.getAllTeams(teams);
     if (teamArray.length === 0) {
-      throw new Error("No teams available to assign player to.");
+      console.error("No teams available to assign player to.");
+      return null;
     }
 
     const minPlayerCount = Math.min(
@@ -54,10 +61,11 @@ class TeamManager {
     for (const team of this.getAllTeams(teams)) {
       if (team.players.has(playerId)) {
         team.players.delete(playerId);
-        return;
+        return team;
       }
     }
-    throw new Error(`Player with ID ${playerId} not found in any team.`);
+    console.error(`Player with ID ${playerId} not found in any team.`);
+    return null;
   }
 
   getTeamOfPlayer(teams, playerId) {
@@ -66,13 +74,14 @@ class TeamManager {
         return team;
       }
     }
-    throw new Error(`Player with ID ${playerId} not found in any team.`);
+    console.error(`Player with ID ${playerId} not found in any team.`);
+    return null;
   }
 
   getTeamById(teams, teamId) {
     const team = teams.get(teamId);
     if (!team) {
-      throw new Error(`Team with ID ${teamId} not found.`);
+      console.error(`Team with ID ${teamId} not found.`);
     }
     return team;
   }

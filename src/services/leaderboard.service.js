@@ -1,7 +1,4 @@
-import {
-  Leaderboard,
-  User,
-} from "../models/index.js";
+import { Leaderboard, User } from "../models/index.js";
 import { fn, col, literal } from "sequelize";
 
 class LeaderboardService {
@@ -44,7 +41,7 @@ class LeaderboardService {
       return leaderboardEntry;
     } catch (error) {
       console.error("Error creating leaderboard entry:", error);
-      throw error;
+      return null;
     }
   }
 
@@ -59,7 +56,7 @@ class LeaderboardService {
       return leaderboardEntry;
     } catch (error) {
       console.error("Error fetching player stats:", error);
-      throw error;
+      return null;
     }
   }
 
@@ -106,8 +103,8 @@ class LeaderboardService {
           }
         : null;
     } catch (error) {
-      console.error("Error fetching player stats by event ID:", error);
-      throw error;
+      console.error("Error fetching player stats:", error);
+      return null;
     }
   }
 
@@ -170,7 +167,7 @@ class LeaderboardService {
       return enrichedEntries;
     } catch (error) {
       console.error("Error fetching event boss all-time leaderboard:", error);
-      throw error;
+      return null;
     }
   }
 
@@ -247,7 +244,7 @@ class LeaderboardService {
       return enrichedEntries;
     } catch (error) {
       console.error("Error fetching event all-time leaderboard:", error);
-      throw error;
+      return null;
     }
   }
 }

@@ -21,22 +21,22 @@ class BadgeService {
           type: "achievement",
           threshold: null,
         },
-        // {
-        //   name: "Boss Defeated",
-        //   image: "/badges/boss-defeated.png",
-        //   description: "Defeat a boss",
-        //   code: "boss-defeated",
-        //   type: "achievement",
-        //   threshold: null,
-        // },
         {
-          name: "Team Victory",
-          image: "/badges/team-victory.png",
-          description: "Be part of a winning team",
-          code: "team-victory",
+          name: "Boss Defeated",
+          image: "/badges/boss-defeated.png",
+          description: "Defeat a boss",
+          code: "boss-defeated",
           type: "achievement",
           threshold: null,
         },
+        // {
+        //   name: "Team Victory",
+        //   image: "/badges/team-victory.png",
+        //   description: "Be part of a winning team",
+        //   code: "team-victory",
+        //   type: "achievement",
+        //   threshold: null,
+        // },
         {
           name: "10 Questions",
           image: "/badges/10-questions.png",
@@ -69,6 +69,14 @@ class BadgeService {
           type: "milestone",
           threshold: 100,
         },
+        {
+          name: "Hero",
+          image: "/badges/hero.png",
+          description: "Defeat all bosses in an event",
+          code: "hero",
+          type: "milestone",
+          threshold: null ,
+        }
       ];
 
       for (const badge of badges) {
@@ -99,7 +107,7 @@ class BadgeService {
       });
     } catch (error) {
       console.error("Error getting badges:", error);
-      throw error;
+      return null;
     }
   }
 
@@ -128,12 +136,10 @@ class BadgeService {
         badgeCode: playerBadge.badge.code,
         eventBossId: playerBadge.eventBossId,
         eventId: playerBadge.eventId,
-        earnCount: playerBadge.earnCount,
-        lastEarnedAt: playerBadge.lastEarnedAt,
       }));
     } catch (error) {
       console.error("Error getting player badges:", error);
-      throw error;
+      return null;
     }
   }
 
@@ -147,12 +153,14 @@ class BadgeService {
     try {
       const badge = await Badge.findByPk(badgeId);
       if (!badge) {
-        throw new Error(`Badge with ID ${badgeId} not found.`);
+        console.error(`Badge with ID ${badgeId} not found.`);
+        return null;
       }
 
       const event = await Event.findByPk(eventId);
       if (!event) {
-        throw new Error(`Event with ID ${eventId} not found.`);
+        console.error(`Event with ID ${eventId} not found.`);
+        return null;
       }
 
       const [userBadge, created] = await UserBadge.findOrCreate({
@@ -162,18 +170,11 @@ class BadgeService {
           eventBossId: badgeType === "achievement" ? eventBossId : null,
           eventId: eventId,
         },
-        defaults: {
-          earnCount: 1,
-          lastEarnedAt: new Date(),
-        },
       });
 
       if (!created) {
-        if (badgeType === "milestone") {
-          throw new Error("Player has already earned this milestone badge.");
-        }
-        await userBadge.increment("earnCount", { by: 1 });
-        await userBadge.update({ lastEarnedAt: new Date() });
+        console.error("Player has already earned this badge.");
+        return null;
       }
 
       await userBadge.reload({
@@ -190,12 +191,10 @@ class BadgeService {
         badgeCode: userBadge.badge.code,
         eventBossId: userBadge.eventBossId,
         eventId: userBadge.eventId,
-        earnCount: userBadge.earnCount,
-        lastEarnedAt: userBadge.lastEarnedAt,
       };
     } catch (error) {
       console.error(`Error awarding ${badgeType} badge: ${error}`);
-      throw error;
+      return null;
     }
   }
 }

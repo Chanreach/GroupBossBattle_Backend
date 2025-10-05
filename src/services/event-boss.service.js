@@ -11,6 +11,40 @@ class EventBossService {
             model: Boss,
             as: "boss",
           },
+        ],
+      });
+
+      if (!eventBoss) {
+        console.error("Event boss not found");
+        return null;
+      }
+
+      return {
+        id: eventBoss.id,
+        name: eventBoss.boss.name,
+        description: eventBoss.boss.description,
+        image: eventBoss.boss.image,
+        creatorId: eventBoss.boss.creatorId,
+        status: eventBoss.status,
+        numberOfTeams: eventBoss.numberOfTeams,
+        cooldownDuration: eventBoss.cooldownDuration,
+        cooldownEndTime: eventBoss.cooldownEndTime,
+        joinCode: eventBoss.joinCode,
+      };
+    } catch (error) {
+      console.error("Error getting event boss by ID:", error);
+      return null;
+    }
+  }
+
+  static async getEventBossAndEventById(eventBossId) {
+    try {
+      const eventBoss = await EventBoss.findByPk(eventBossId, {
+        include: [
+          {
+            model: Boss,
+            as: "boss",
+          },
           {
             model: Event,
             as: "event",
@@ -19,7 +53,8 @@ class EventBossService {
       });
 
       if (!eventBoss) {
-        throw new Error("Event boss not found");
+        console.error("Event boss not found");
+        return null;
       }
 
       return {
@@ -44,8 +79,43 @@ class EventBossService {
         },
       };
     } catch (error) {
-      console.error("Error fetching event boss by ID:", error);
-      throw error;
+      console.error("Error getting event boss and event by ID:", error);
+      return null;
+    }
+  }
+
+  static async getAllEventBosses(eventId) {
+    try {
+      const eventBosses = await EventBoss.findAll({
+        where: { eventId },
+        include: [
+          {
+            model: Boss,
+            as: "boss",
+          },
+        ],
+      });
+      
+      if (!eventBosses || eventBosses.length === 0) {
+        console.error("No event bosses found");
+        return [];
+      }
+
+      return eventBosses.map((eventBoss) => ({
+        id: eventBoss.id,
+        name: eventBoss.boss.name,
+        description: eventBoss.boss.description,
+        image: eventBoss.boss.image,
+        creatorId: eventBoss.boss.creatorId,
+        status: eventBoss.status,
+        numberOfTeams: eventBoss.numberOfTeams,
+        cooldownDuration: eventBoss.cooldownDuration,
+        cooldownEndTime: eventBoss.cooldownEndTime,
+        joinCode: eventBoss.joinCode,
+      }));
+    } catch (error) {
+      console.error("Error getting all event bosses:", error);
+      return null;
     }
   }
 
@@ -53,8 +123,10 @@ class EventBossService {
     try {
       const eventBoss = await EventBoss.findByPk(eventBossId);
       if (!eventBoss) {
-        throw new Error("Event boss not found");
+        console.error("Event boss not found");
+        return null;
       }
+
       eventBoss.status = status;
       if (status === GAME_CONSTANTS.BOSS_STATUS.ACTIVE) {
         eventBoss.cooldownEndTime = null;
@@ -67,7 +139,7 @@ class EventBossService {
       return eventBoss;
     } catch (error) {
       console.error("Error updating event boss status:", error);
-      throw error;
+      return null;
     }
   }
 

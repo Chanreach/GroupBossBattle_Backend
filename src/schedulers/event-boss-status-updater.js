@@ -9,14 +9,14 @@ cron.schedule("* * * * *", async () => {
 
     for (const eventBoss of eventBosses) {
       let newStatus = eventBoss.status;
-      if (eventBoss.status === "cooldown" && eventBoss.cooldownEndsAt <= now) {
+      if (eventBoss.status === "cooldown" && eventBoss.cooldownEndTime <= now) {
         newStatus = "active";
       }
 
       if (eventBoss.status !== newStatus) {
-        await eventBoss.update({ status: newStatus, cooldownEndsAt: null });
+        await eventBoss.update({ status: newStatus, cooldownEndTime: null });
         console.log(
-          `[Status Updated] EventBoss: ${eventBoss.name} → ${newStatus}`
+          `[Status Updated] EventBoss: ${eventBoss.id} → ${newStatus}`
         );
       }
     }

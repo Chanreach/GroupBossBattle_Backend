@@ -75,6 +75,7 @@ export const GAME_CONSTANTS = {
       QUESTIONS_25: "questions_25",
       QUESTIONS_50: "questions_50",
       QUESTIONS_100: "questions_100",
+      HERO: "hero",
     },
   },
 

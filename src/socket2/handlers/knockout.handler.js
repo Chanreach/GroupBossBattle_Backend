@@ -1,7 +1,5 @@
 import {
   SOCKET_EVENTS,
-  SOCKET_ERRORS,
-  SOCKET_MESSAGES,
   SOCKET_ROOMS,
 } from "../../utils/socket.constants.js";
 import battleSessionManager from "../../managers/battle-session.manager.js";

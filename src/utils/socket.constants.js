@@ -5,6 +5,21 @@ export const SOCKET_EVENTS = {
   DISCONNECT: "disconnect",
   ERROR: "error",
 
+  // ===== BOSS EVENTS ===== //
+  BOSS: {
+    REQUEST: "boss:request",
+    RESPONSE: "boss:response",
+    NOT_FOUND: "boss:not-found",
+  },
+
+  // ==== BOSS STATUS EVENTS ===== //
+  BOSS_STATUS: {
+    REQUEST: "boss-status:request",
+    RESPONSE: "boss-status:response",
+    UPDATE: "boss-status:update",
+    UPDATED: "boss-status:updated",
+  },
+
   // ===== BOSS PREVIEW EVENTS ===== //
   BOSS_PREVIEW: {
     JOIN: "boss-preview:join",
@@ -16,7 +31,7 @@ export const SOCKET_EVENTS = {
     BATTLE_SESSION: {
       ENDED: "boss-preview:battle-session-ended",
     },
-    
+
     LEADERBOARD: {
       REQUEST: "boss-preview:leaderboard-request",
       RESPONSE: "boss-preview:leaderboard-response",
@@ -45,6 +60,7 @@ export const SOCKET_EVENTS = {
     REQUEST: "battle-session:request",
     RESPONSE: "battle-session:response",
     ENDED: "battle-session:ended",
+    NOT_FOUND: "battle-session:not-found",
 
     JOIN: "battle-session:join",
     LEAVE: "battle-session:leave",
@@ -145,18 +161,6 @@ export const SOCKET_EVENTS = {
     VALIDATION: "nickname:validation",
   },
 
-  // ===== BOSS EVENTS ===== //
-  BOSS: {
-    SPAWN: "boss:spawn",
-    DESPAWN: "boss:despawn",
-    REQUEST_STATUS: "boss:request_status",
-  },
-
-  BOSS_STATUS: {
-    UPDATE: "boss-status:update",
-    UPDATED: "boss-status:updated",
-  },
-
   // ===== BADGE EVENTS ===== //
   BADGE: {
     EARNED: "badge:earned",
@@ -173,32 +177,16 @@ export const SOCKET_ROOMS = {
   BATTLE_MONITOR: (eventBossId) => `battle-monitor:${eventBossId}`,
 };
 
-// ===== SOCKET ERRORS ===== //
-export const SOCKET_ERRORS = {
-  MISSING_DATA: "Missing required data",
-  NOT_FOUND: "Resource not found",
-  INTERNAL_SERVER: "Internal server error",
-};
-
 // ===== SOCKET MESSAGES ===== //
 export const SOCKET_MESSAGES = {
-  INVALID_JOIN: "Invalid join attempt.",
-  NOT_FOUND_ERROR: "The requested resource was not found.",
-  INTERNAL_SERVER_ERROR:
-    "An internal server error occurred. Please try again later.",
-
-  // ===== BATTLE QUEUE MESSAGES ===== //
-  BATTLE_QUEUE: {
-    JOINED: "Successfully joined the battle queue.",
-    LEFT: "Successfully left the battle queue.",
-  },
-
   BADGE_EARNED: {
     "mvp": (playerName) =>
       `Congratulations ${playerName}! You've earned the MVP badge for your outstanding performance!`,
     "last-hit": (playerName) =>
       `Congratulations ${playerName}! You've earned the Last Hit badge for delivering the final blow!`,
-    "team-victory": (teamName) =>
-      `Congratulations Team ${teamName}! You've earned the Team Victory badge for your collective effort!`,
+    "boss-defeated": (teamName) =>
+      `Congratulations Team ${teamName}! You've earned the Boss Defeated badge for your collective effort!`,
+    "hero": (playerName) =>
+      `Congratulations ${playerName}! You've earned the Hero badge for defeating all bosses in the event!`,
   },
 };
