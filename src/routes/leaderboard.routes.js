@@ -1,7 +1,10 @@
 import express from "express";
+import leaderboardController from "../controllers/leaderboard.controller.js";
 import LeaderboardService from "../services/leaderboard.service.js";
 
 const router = express.Router();
+
+router.get("/", leaderboardController.getAllEventAllTimeLeaderboards);
 
 router.get("/all-time", async (req, res) => {
   try {
