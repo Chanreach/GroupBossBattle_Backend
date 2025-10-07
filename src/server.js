@@ -21,6 +21,7 @@ import bossPreviewRoutes from "./routes/bosspreview.routes.js";
 import joinRoutes from "./routes/join.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import badgeRoutes from "./routes/badge.routes.js";
+import userBadgeRoutes from "./routes/user_badge.routes.js";
 import leaderboardRoutes from "./routes/leaderboard.routes.js";
 import heartBeatRoutes from "./routes/heartbeat.routes.js";
 
@@ -63,6 +64,7 @@ app.use("/api/event-bosses", eventBossRoutes);
 app.use("/api/boss-preview", bossPreviewRoutes);
 app.use("/api/join", joinRoutes);
 app.use("/api/badges", badgeRoutes);
+app.use("/api/user-badges", userBadgeRoutes);
 app.use("/api/leaderboards", leaderboardRoutes);
 app.use("/api/heartbeat", heartBeatRoutes);
 
