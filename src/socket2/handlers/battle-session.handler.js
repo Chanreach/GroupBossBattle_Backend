@@ -33,7 +33,8 @@ const handleBattleSession = (io, socket) => {
 
       const player = battleSessionManager.reconnectPlayerToBattleSession(
         eventBossId,
-        playerId
+        playerId,
+        socket.id
       );
       if (!player) {
         socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.NOT_FOUND, {
