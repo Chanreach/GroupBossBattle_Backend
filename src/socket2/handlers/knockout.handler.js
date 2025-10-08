@@ -29,7 +29,6 @@ const handleKnockout = (io, socket) => {
           );
         if (!knockedOutPlayer) {
           socket.emit(SOCKET_EVENTS.ERROR, {
-            code: SOCKET_ERRORS.NOT_FOUND,
             message: "Player not found for revival.",
           });
           return;
@@ -61,7 +60,6 @@ const handleKnockout = (io, socket) => {
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INTERNAL_SERVER,
         message: "An error occurred while submitting the revival code.",
       });
     }
@@ -96,7 +94,6 @@ const handleKnockout = (io, socket) => {
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INTERNAL_SERVER,
         message: "An error occurred while handling revival code expiry.",
       });
     }
