@@ -90,6 +90,12 @@ const handleBattleSession = (io, socket) => {
         eventBossId,
         playerId
       );
+      if (playerState === GAME_CONSTANTS.PLAYER.BATTLE_STATE.DEAD) {
+        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.DEAD, {
+          message: "You are out of the battle.",
+        });
+        return;
+      }
       if (playerState === GAME_CONSTANTS.PLAYER.BATTLE_STATE.KNOCKED_OUT) {
         const knockoutInfo = battleSessionManager.getKnockedOutPlayerInfo(
           eventBossId,
@@ -99,11 +105,6 @@ const handleBattleSession = (io, socket) => {
           message:
             "You have been knocked out! Share your revival code with teammates.",
           data: { knockoutInfo },
-        });
-        return;
-      } else if (playerState === GAME_CONSTANTS.PLAYER.BATTLE_STATE.DEAD) {
-        socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.DEAD, {
-          message: "You are out of the battle.",
         });
         return;
       }
