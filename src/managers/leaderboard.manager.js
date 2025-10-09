@@ -215,20 +215,20 @@ class LeaderboardManager {
     const leaderboardArray = Array.from(leaderboard.values());
     leaderboardArray.sort((a, b) => {
       const scoreA = [
-        a.totalDamage || a.totalDamageDealt,
-        a.accuracy,
-        -a.averageResponseTime,
-        a.hearts || 0,
-        a.revivedCount || 0,
+        a.totalDamage ?? a.totalDamageDealt,
+        a.accuracy ?? 0,
+        -(a.averageResponseTime ?? 0),
+        a.hearts ?? 0,
+        a.revivedCount ?? 0,
       ];
       const scoreB = [
-        b.totalDamage || b.totalDamageDealt,
-        b.accuracy,
-        -b.averageResponseTime,
-        b.hearts || 0,
-        b.revivedCount || 0,
+        b.totalDamage ?? b.totalDamageDealt,
+        b.accuracy ?? 0,
+        -(b.averageResponseTime ?? 0),
+        b.hearts ?? 0,
+        b.revivedCount ?? 0,
       ];
-      return compareScores(scoreB, scoreA);
+      return compareScores(scoreA, scoreB);
     });
 
     let currentRank = 1;
