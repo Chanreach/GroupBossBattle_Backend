@@ -142,14 +142,18 @@ const getAllUserBadges = async (req, res) => {
         status: event.status,
         startTime: event.startTime,
         endTime: event.endTime,
-        totalEventBosses: eventBosses.length,
+        totalEventBosses: eventBossesByEvent[event.id]?.length || 0,
         totalUserBadges: totalUserBadges,
         maxMilestoneBadges: milestoneBadges.length,
         maxBadges:
           milestoneBadges.length +
-          eventBosses.length * achievementBadges.length,
+          eventBossesByEvent[event.id]?.length * achievementBadges.length,
         eventBosses: bossesData,
-        milestoneBadges: milestoneBadgesData,
+        milestoneBadges:
+          !eventBossesByEvent[event.id] ||
+          eventBossesByEvent[event.id].length === 0
+            ? []
+            : milestoneBadgesData,
         totalMilestoneBadges: milestoneBadgesData.filter((mb) => mb.isEarned)
           .length,
       });
