@@ -34,7 +34,17 @@ const getAllUserBadges = async (req, res) => {
       .sort((a, b) => a.name.localeCompare(b.name));
     const milestoneBadges = badges
       .filter((b) => b.type === "milestone")
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => {
+        const aHasThreshold = a.threshold !== null && a.threshold !== undefined;
+        const bHasThreshold = b.threshold !== null && b.threshold !== undefined;
+
+        if (aHasThreshold && !bHasThreshold) return -1;
+        if (!aHasThreshold && bHasThreshold) return 1;
+        if (!aHasThreshold && !bHasThreshold)
+          return a.name.localeCompare(b.name);
+
+        return a.threshold - b.threshold;
+      });
 
     const eventBossesByEvent = eventBosses.reduce((acc, eb) => {
       if (!acc[eb.eventId]) {
