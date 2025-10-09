@@ -26,12 +26,17 @@ const getAllUserBadges = async (req, res) => {
         }),
         Badge.findAll(),
         EventBoss.findAll({ include: [{ model: Boss, as: "boss" }] }),
-        UserBadge.findAll({ where: { userId }, include: [{ model: Badge, as: "badge" }] }),
+        UserBadge.findAll({
+          where: { userId },
+          include: [{ model: Badge, as: "badge" }],
+        }),
         Leaderboard.findAll({ where: { userId } }),
       ]);
     console.log("Fetched data:", userBadges.length);
     userBadges.forEach((ub) => {
-      console.log(`UserBadge: ${ub.id}, Badge: ${ub.badge ? ub.badge.name : 'N/A'}`);
+      console.log(
+        `UserBadge: ${ub.id}, Badge: ${ub.badge ? ub.badge.name : "N/A"}`
+      );
     });
 
     const achievementBadges = badges
@@ -81,13 +86,31 @@ const getAllUserBadges = async (req, res) => {
       const userBadgesForEvent = userBadgesByEvent[event.id] || [];
       const leaderboardsForEvent = leaderboardsByEvent[event.id] || [];
 
-      console.log(`Processing Event: ${event.name}, UserBadges: ${userBadgesForEvent.length}`);
+      console.log(
+        `Processing Event: ${event.name}, UserBadges: ${userBadgesForEvent.length}`
+      );
 
       const milestoneBadgesData = milestoneBadges.map((mb) => {
         const userBadge = userBadgesForEvent.find(
           (ub) => ub.badgeId === mb.id && ub.eventBossId === null
         );
-        console.log(`Milestone Badge: ${mb.name}, UserBadge: ${userBadge ? userBadge.badge.name : 'N/A'}`);
+        console.log(
+          `Milestone Badge: ${mb.name}, UserBadge: ${
+            userBadge ? userBadge.badge.name : "N/A"
+          }`
+        );
+        console.log(
+          `Milestone Badge: ${mb.name}, isEarned: ${!!userBadge}, earnedAt: ${
+            userBadge?.earnedAt
+          }, isRedeemed: ${userBadge?.isRedeemed}, progress: ${
+            mb.code === "hero"
+              ? getBossDefeatedCount(userBadgesForEvent)
+              : leaderboardsForEvent?.reduce(
+                  (acc, lb) => acc + lb.totalCorrectAnswers,
+                  0
+                ) || 0
+          }`
+        );
         return {
           id: mb.id,
           name: mb.name,
@@ -118,6 +141,18 @@ const getAllUserBadges = async (req, res) => {
         const bossBadges = achievementBadges.map((ab) => {
           const userBadge = userBadgesForBoss.find(
             (ub) => ub.badgeId === ab.id
+          );
+          console.log(
+            `Achievement Badge: ${ab.name}, UserBadge: ${
+              userBadge ? userBadge.badge.name : "N/A"
+            }`
+          );
+          console.log(
+            `Achievement Badge: ${
+              ab.name
+            }, isEarned: ${!!userBadge}, earnedAt: ${
+              userBadge?.earnedAt
+            }, isRedeemed: ${userBadge?.isRedeemed}`
           );
           return {
             id: ab.id,
@@ -234,7 +269,9 @@ const getAllUserBadgesByEventId = async (req, res) => {
       const userEntry = usersMap.get(ub.userId) || {
         id: ub.user.id,
         name: ub.user.username,
-        profileImage: ub.user.profileImage ? getImageUrl(ub.user.profileImage) : null,
+        profileImage: ub.user.profileImage
+          ? getImageUrl(ub.user.profileImage)
+          : null,
         eventBosses: [],
         milestoneBadges: [],
       };
