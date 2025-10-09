@@ -1,6 +1,7 @@
 import { EventBoss, Boss, Event } from "../models/index.js";
 import UserService from "./user.service.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
+import { getImageUrl } from "../utils/image.utils.js";
 
 class EventBossService {
   static async getEventBossById(eventBossId) {
@@ -23,7 +24,7 @@ class EventBossService {
         id: eventBoss.id,
         name: eventBoss.boss.name,
         description: eventBoss.boss.description,
-        image: eventBoss.boss.image,
+        image: eventBoss.boss.image ? getImageUrl(eventBoss.boss.image) : null,
         creatorId: eventBoss.boss.creatorId,
         status: eventBoss.status,
         numberOfTeams: eventBoss.numberOfTeams,

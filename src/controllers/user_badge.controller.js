@@ -26,7 +26,7 @@ const getAllUserBadges = async (req, res) => {
         }),
         Badge.findAll(),
         EventBoss.findAll({ include: [{ model: Boss, as: "boss" }] }),
-        UserBadge.findAll({ where: { userId }, include: [{ model: Badge, as: "badge" }] }),
+        UserBadge.findAll({ where: { userId } }),
         Leaderboard.findAll({ where: { userId } }),
       ]);
 
