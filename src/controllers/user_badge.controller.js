@@ -147,6 +147,7 @@ const getAllUserBadges = async (req, res) => {
               userBadge ? userBadge.badge.name : "N/A"
             }`
           );
+          console.log("User Badge: ", userBadge);
           console.log(
             `Achievement Badge: ${
               ab.name
