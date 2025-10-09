@@ -29,6 +29,10 @@ const getAllUserBadges = async (req, res) => {
         UserBadge.findAll({ where: { userId }, include: [{ model: Badge, as: "badge" }] }),
         Leaderboard.findAll({ where: { userId } }),
       ]);
+    console.log("Fetched data:", userBadges.length);
+    userBadges.forEach((ub) => {
+      console.log(`UserBadge: ${ub.id}, Badge: ${ub.badge ? ub.badge.name : 'N/A'}`);
+    });
 
     const achievementBadges = badges
       .filter((b) => b.type === "achievement")
