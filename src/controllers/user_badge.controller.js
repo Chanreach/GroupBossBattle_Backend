@@ -73,16 +73,21 @@ const getAllUserBadges = async (req, res) => {
       return acc;
     }, {});
 
+    console.log("User Badges by Event:", userBadgesByEvent);
+
     const formattedEvents = [];
     for (const event of events) {
       const eventBossesList = eventBossesByEvent[event.id] || [];
       const userBadgesForEvent = userBadgesByEvent[event.id] || [];
       const leaderboardsForEvent = leaderboardsByEvent[event.id] || [];
 
+      console.log(`Processing Event: ${event.name}, UserBadges: ${userBadgesForEvent.length}`);
+
       const milestoneBadgesData = milestoneBadges.map((mb) => {
         const userBadge = userBadgesForEvent.find(
           (ub) => ub.badgeId === mb.id && ub.eventBossId === null
         );
+        console.log(`Milestone Badge: ${mb.name}, UserBadge: ${userBadge ? userBadge.badge.name : 'N/A'}`);
         return {
           id: mb.id,
           name: mb.name,
