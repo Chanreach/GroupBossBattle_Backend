@@ -11,6 +11,8 @@ import { Op } from "sequelize";
 import { getImageUrl } from "../utils/image.utils.js";
 
 const getBossDefeatedCount = (userBadges) => {
+  console.log("User Badges:", userBadges);
+  console.log(userBadges.filter((ub) => ub.badge?.code === "boss-defeated"));
   return userBadges.filter((ub) => ub.badge?.code === "boss-defeated").length;
 };
 
@@ -26,7 +28,7 @@ const getAllUserBadges = async (req, res) => {
         }),
         Badge.findAll(),
         EventBoss.findAll({ include: [{ model: Boss, as: "boss" }] }),
-        UserBadge.findAll({ where: { userId } }),
+        UserBadge.findAll({ where: { userId }, include: [{ model: Badge, as: "badge" }] }),
         Leaderboard.findAll({ where: { userId } }),
       ]);
 
