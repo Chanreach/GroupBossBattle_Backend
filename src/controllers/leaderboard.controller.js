@@ -4,6 +4,8 @@ import { compareScores } from "../utils/game.utils.js";
 import { getImageUrl } from "../utils/image.utils.js";
 
 const rankLeaderboard = (entries) => {
+  if (!entries || entries.length === 0) return [];
+  
   entries.sort((a, b) => {
     const scoreA = [a.totalDamageDealt, a.accuracy, a.totalBattlesParticipated];
     const scoreB = [b.totalDamageDealt, b.accuracy, b.totalBattlesParticipated];
