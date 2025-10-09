@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 const getAllUsers = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "" } = req.query;
+    const { page = 1, search = "" } = req.query;
     const offset = (page - 1) * limit;
 
     const whereClause = search ? {
@@ -25,7 +25,6 @@ const getAllUsers = async (req, res) => {
       where: whereClause,
       attributes: ['id', 'username', 'email', 'role', 'createdAt', 'updatedAt'],
       order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
       offset
     });
 
@@ -33,7 +32,7 @@ const getAllUsers = async (req, res) => {
       users: users.rows,
       totalCount: users.count,
       currentPage: parseInt(page),
-      totalPages: Math.ceil(users.count / limit),
+      totalPages: Math.ceil(users.count / 10),
     });
   } catch (error) {
     console.error("Error fetching users:", error);
