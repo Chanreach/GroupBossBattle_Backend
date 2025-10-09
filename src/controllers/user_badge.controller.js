@@ -11,8 +11,6 @@ import { Op } from "sequelize";
 import { getImageUrl } from "../utils/image.utils.js";
 
 const getBossDefeatedCount = (userBadges) => {
-  console.log("User Badges:", userBadges);
-  console.log(userBadges.filter((ub) => ub.badge?.code === "boss-defeated"));
   return userBadges.filter((ub) => ub.badge?.code === "boss-defeated").length;
 };
 
