@@ -2,6 +2,7 @@ import { Boss, Category, User } from "../models/index.js";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { getImageUrl } from "../utils/image.utils.js";
 
 // ES modules equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -11,25 +12,36 @@ const getAllBosses = async (req, res) => {
   try {
     // Get user filter based on role
     const filter = req.bossFilter || {};
-    
+
     const bosses = await Boss.findAll({
       where: filter,
       include: [
         {
           model: Category,
           as: "Categories",
-          through: { attributes: [] }
+          through: { attributes: [] },
         },
         {
           model: User,
           as: "creator",
-          attributes: ['id', 'username', 'email']
-        }
+          attributes: ["id", "username", "email"],
+        },
       ],
-      order: [['createdAt', 'DESC']]
+      order: [["createdAt", "DESC"]],
     });
-    
-    res.status(200).json(bosses);
+
+    const transformedBosses = bosses.map((boss) => {
+      if (boss.image) {
+        boss.image = getImageUrl(boss.image);
+      }
+
+      if (boss.creator && boss.creator.profileImage) {
+        boss.creator.profileImage = getImageUrl(boss.creator.profileImage);
+      }
+      return boss;
+    });
+
+    res.status(200).json(transformedBosses);
   } catch (error) {
     console.error("Error fetching bosses:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -44,26 +56,31 @@ const getBossById = async (req, res) => {
         {
           model: Category,
           as: "Categories",
-          through: { attributes: [] }
+          through: { attributes: [] },
         },
         {
           model: User,
           as: "creator",
-          attributes: ['id', 'username', 'email']
-        }
-      ]
+          attributes: ["id", "username", "email"],
+        },
+      ],
     });
-    
+
     if (!boss) {
       return res.status(404).json({ message: "Boss not found" });
     }
-    
+
     // Check permissions: Host can only view their own bosses, Admin can view all
     const { role, id: userId } = req.user;
-    if (role === 'host' && boss.creatorId !== userId) {
-      return res.status(403).json({ message: "Access denied. You can only view your own bosses." });
+    if (role === "host" && boss.creatorId !== userId) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You can only view your own bosses." });
     }
-    
+
+    if (boss.image) {
+      boss.image = getImageUrl(boss.image);
+    }
     res.status(200).json(boss);
   } catch (error) {
     console.error("Error fetching boss:", error);
@@ -72,14 +89,9 @@ const getBossById = async (req, res) => {
 };
 
 const createBoss = async (req, res) => {
-  const {
-    name,
-    description,
-    cooldownDuration,
-    numberOfTeams,
-    categoryIds,
-  } = req.body;
-  
+  const { name, description, cooldownDuration, numberOfTeams, categoryIds } =
+    req.body;
+
   try {
     console.log("Creating boss with data:", {
       name,
@@ -93,7 +105,10 @@ const createBoss = async (req, res) => {
     let parsedCategoryIds = [];
     if (categoryIds) {
       try {
-        parsedCategoryIds = typeof categoryIds === 'string' ? JSON.parse(categoryIds) : categoryIds;
+        parsedCategoryIds =
+          typeof categoryIds === "string"
+            ? JSON.parse(categoryIds)
+            : categoryIds;
       } catch (parseError) {
         console.error("Error parsing categoryIds:", parseError);
         return res.status(400).json({ message: "Invalid categoryIds format" });
@@ -103,7 +118,7 @@ const createBoss = async (req, res) => {
     // Handle image upload
     let imagePath = null;
     if (req.file) {
-      imagePath = req.file.filename; // Store just the filename, not the full path
+      imagePath = `bosses/${req.file.filename}`;
     }
 
     const newBoss = await Boss.create({
@@ -112,7 +127,7 @@ const createBoss = async (req, res) => {
       description,
       cooldownDuration: cooldownDuration || 60,
       numberOfTeams: numberOfTeams || 2,
-      creatorId: req.user.id
+      creatorId: req.user.id,
     });
 
     // If categoryIds are provided, associate them with the new boss
@@ -137,16 +152,24 @@ const createBoss = async (req, res) => {
         {
           model: Category,
           as: "Categories",
-          through: { attributes: [] }
+          through: { attributes: [] },
         },
         {
           model: User,
           as: "creator",
-          attributes: ['id', 'username', 'email']
-        }
+          attributes: ["id", "username", "email"],
+        },
       ],
     });
 
+    if (bossWithCategories.image) {
+      bossWithCategories.image = getImageUrl(bossWithCategories.image);
+    }
+    if (bossWithCategories.creator && bossWithCategories.creator.profileImage) {
+      bossWithCategories.creator.profileImage = getImageUrl(
+        bossWithCategories.creator.profileImage
+      );
+    }
     res.status(201).json(bossWithCategories);
   } catch (error) {
     console.error("Error creating boss:", error);
@@ -156,12 +179,13 @@ const createBoss = async (req, res) => {
 
 const updateBoss = async (req, res) => {
   const { id } = req.params;
-  const { name, description, cooldownDuration, numberOfTeams, categoryIds } = req.body;
-  
+  const { name, description, cooldownDuration, numberOfTeams, categoryIds } =
+    req.body;
+
   try {
     // Parse categoryIds if it's a JSON string (from FormData)
     let parsedCategoryIds = categoryIds;
-    if (categoryIds && typeof categoryIds === 'string') {
+    if (categoryIds && typeof categoryIds === "string") {
       try {
         parsedCategoryIds = JSON.parse(categoryIds);
       } catch (parseError) {
@@ -174,74 +198,89 @@ const updateBoss = async (req, res) => {
     if (!boss) {
       return res.status(404).json({ message: "Boss not found" });
     }
-    
+
     // Check permissions: Host can only update their own bosses, Admin can update all
     const { role, id: userId } = req.user;
-    if (role === 'host' && boss.creatorId !== userId) {
-      return res.status(403).json({ message: "Access denied. You can only edit your own bosses." });
+    if (role === "host" && boss.creatorId !== userId) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You can only edit your own bosses." });
     }
-    
+
     // Handle image upload
     if (req.file) {
       // Delete old image if it exists
       if (boss.image) {
-        const oldImagePath = path.join(__dirname, '../../uploads/bosses', boss.image);
+        const oldImagePath = path.join(
+          __dirname,
+          "../../uploads/bosses",
+          boss.image
+        );
         try {
           if (fs.existsSync(oldImagePath)) {
             fs.unlinkSync(oldImagePath);
             console.log(`Old boss image deleted: ${oldImagePath}`);
           }
         } catch (deleteError) {
-          console.error(`Error deleting old boss image: ${deleteError.message}`);
+          console.error(
+            `Error deleting old boss image: ${deleteError.message}`
+          );
           // Continue with update even if old image deletion fails
         }
       }
-      boss.image = req.file.filename; // Store just the filename
-      console.log(`New boss image set: ${req.file.filename}`);
+      boss.image = `bosses/${req.file.filename}`;
     }
-    
+
     // Update boss fields
     boss.name = name || boss.name;
     boss.description = description || boss.description;
     boss.cooldownDuration = cooldownDuration || boss.cooldownDuration;
     boss.numberOfTeams = numberOfTeams || boss.numberOfTeams;
-    
+
     await boss.save();
-    
+
     // Update categories if provided
     if (Array.isArray(parsedCategoryIds)) {
       if (parsedCategoryIds.length > 0) {
         const categories = await Category.findAll({
-          where: { id: parsedCategoryIds }
+          where: { id: parsedCategoryIds },
         });
-        
+
         if (categories.length !== parsedCategoryIds.length) {
           return res.status(400).json({ message: "Some categories not found" });
         }
-        
+
         await boss.setCategories(categories);
       } else {
         // Clear all categories if empty array is provided
         await boss.setCategories([]);
       }
     }
-    
+
     // Fetch updated boss with associations
     const updatedBoss = await Boss.findByPk(id, {
       include: [
         {
           model: Category,
           as: "Categories",
-          through: { attributes: [] }
+          through: { attributes: [] },
         },
         {
           model: User,
           as: "creator",
-          attributes: ['id', 'username', 'email']
-        }
-      ]
+          attributes: ["id", "username", "email"],
+        },
+      ],
     });
-    
+
+    if (updatedBoss.image) {
+      updatedBoss.image = getImageUrl(updatedBoss.image);
+    }
+    if (updatedBoss.creator && updatedBoss.creator.profileImage) {
+      updatedBoss.creator.profileImage = getImageUrl(
+        updatedBoss.creator.profileImage
+      );
+    }
     res.status(200).json(updatedBoss);
   } catch (error) {
     console.error("Error updating boss:", error);
@@ -256,16 +295,22 @@ const deleteBoss = async (req, res) => {
     if (!boss) {
       return res.status(404).json({ message: "Boss not found" });
     }
-    
+
     // Check permissions: Host can only delete their own bosses, Admin can delete all
     const { role, id: userId } = req.user;
-    if (role === 'host' && boss.creatorId !== userId) {
-      return res.status(403).json({ message: "Access denied. You can only delete your own bosses." });
+    if (role === "host" && boss.creatorId !== userId) {
+      return res.status(403).json({
+        message: "Access denied. You can only delete your own bosses.",
+      });
     }
-    
+
     // Delete associated image file if it exists
     if (boss.image) {
-      const imagePath = path.join(__dirname, '../../uploads/bosses', boss.image);
+      const imagePath = path.join(
+        __dirname,
+        "../../uploads/bosses",
+        boss.image
+      );
       try {
         if (fs.existsSync(imagePath)) {
           fs.unlinkSync(imagePath);
@@ -276,7 +321,7 @@ const deleteBoss = async (req, res) => {
         // Continue with boss deletion even if image deletion fails
       }
     }
-    
+
     await boss.destroy();
     res.status(204).send();
   } catch (error) {

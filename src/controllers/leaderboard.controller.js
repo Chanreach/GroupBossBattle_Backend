@@ -1,6 +1,7 @@
 import { Leaderboard, User, Event } from "../models/index.js";
 import { Op, fn, col, literal } from "sequelize";
 import { compareScores } from "../utils/game.utils.js";
+import { getImageUrl } from "../utils/image.utils.js";
 
 const rankLeaderboard = (entries) => {
   entries.sort((a, b) => {
@@ -90,7 +91,7 @@ const getEventAllTimeLeaderboard = async (eventId) => {
           userId,
           eventId: entry.eventId,
           username,
-          profileImage,
+          profileImage: profileImage ? getImageUrl(profileImage) : null,
           totalDamageDealt: Number(entry.get("totalDamageDealt")),
           totalCorrectAnswers: Number(entry.get("totalCorrectAnswers")),
           totalQuestionsAnswered: Number(entry.get("totalQuestionsAnswered")),

@@ -8,6 +8,7 @@ import {
   User,
 } from "../models/index.js";
 import { Op } from "sequelize";
+import { getImageUrl } from "../utils/image.utils.js";
 
 const getBossDefeatedCount = (userBadges) => {
   return userBadges.filter((ub) => ub.badge?.code === "boss-defeated").length;
@@ -224,7 +225,7 @@ const getAllUserBadgesByEventId = async (req, res) => {
       const userEntry = usersMap.get(ub.userId) || {
         id: ub.user.id,
         name: ub.user.username,
-        profileImage: ub.user.profileImage,
+        profileImage: ub.user.profileImage ? getImageUrl(ub.user.profileImage) : null,
         eventBosses: [],
         milestoneBadges: [],
       };

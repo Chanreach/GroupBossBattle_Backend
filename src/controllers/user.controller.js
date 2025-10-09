@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from 'url';
+import { getImageUrl } from "../utils/image.utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,6 +165,10 @@ const getProfile = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    if (user.profileImage) {
+      user.profileImage = getImageUrl(user.profileImage);
+    }
     
     res.status(200).json(user);
   } catch (error) {
@@ -233,7 +238,7 @@ const updateProfile = async (req, res) => {
       }
       
       // Set new profile picture path
-      updateData.profileImage = `/uploads/profiles/${req.file.filename}`;
+      updateData.profileImage = `profiles/${req.file.filename}`;
     }
 
     await user.update(updateData);
@@ -242,6 +247,10 @@ const updateProfile = async (req, res) => {
     const updatedUser = await User.findByPk(userId, {
       attributes: ['id', 'username', 'email', 'role', 'profileImage', 'createdAt', 'updatedAt']
     });
+
+    if (updatedUser.profileImage) {
+      updatedUser.profileImage = getImageUrl(updatedUser.profileImage);
+    }
 
     res.status(200).json({
       message: "Profile updated successfully",

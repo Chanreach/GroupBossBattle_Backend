@@ -4,6 +4,7 @@ import { User } from "../models/index.js";
 import { Op } from "sequelize";
 import { v4 as uuidv4 } from "uuid";
 import generateGuestName from "../utils/generate-guest-name.js";
+import { getImageUrl } from "../utils/image.utils.js";
 
 // Signup controller
 const signup = async (req, res) => {
@@ -101,7 +102,7 @@ const login = async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        profileImage: user.profileImage,
+        profileImage: user.profileImage ? getImageUrl(user.profileImage) : null,
       },
     });
   } catch (error) {
@@ -124,7 +125,7 @@ const me = async (req, res) => {
       username: user.username,
       email: user.email,
       role: user.role,
-      profileImage: user.profileImage,
+      profileImage: user.profileImage ? getImageUrl(user.profileImage) : null,
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
