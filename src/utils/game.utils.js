@@ -124,7 +124,7 @@ export const isApproximatelyEqual = (a, b, tolerance = 1e-6) => {
 export const compareScores = (a, b) => {
   for (let i = 0; i < a.length; i++) {
     if (isApproximatelyEqual(a[i], b[i])) continue;
-    return a[i] > b[i] ? 1 : -1;
+    return a[i] > b[i] ? -1 : 1;
   }
   return 0;
 };
