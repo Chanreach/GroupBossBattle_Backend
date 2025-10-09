@@ -32,12 +32,6 @@ const getAllUserBadges = async (req, res) => {
         }),
         Leaderboard.findAll({ where: { userId } }),
       ]);
-    console.log("Fetched data:", userBadges.length);
-    userBadges.forEach((ub) => {
-      console.log(
-        `UserBadge: ${ub.id}, Badge: ${ub.badge ? ub.badge.name : "N/A"}`
-      );
-    });
 
     const achievementBadges = badges
       .filter((b) => b.type === "achievement")
@@ -78,38 +72,15 @@ const getAllUserBadges = async (req, res) => {
       return acc;
     }, {});
 
-    console.log("User Badges by Event:", userBadgesByEvent);
-
     const formattedEvents = [];
     for (const event of events) {
       const eventBossesList = eventBossesByEvent[event.id] || [];
       const userBadgesForEvent = userBadgesByEvent[event.id] || [];
       const leaderboardsForEvent = leaderboardsByEvent[event.id] || [];
 
-      console.log(
-        `Processing Event: ${event.name}, UserBadges: ${userBadgesForEvent.length}`
-      );
-
       const milestoneBadgesData = milestoneBadges.map((mb) => {
         const userBadge = userBadgesForEvent.find(
           (ub) => ub.badgeId === mb.id && ub.eventBossId === null
-        );
-        console.log(
-          `Milestone Badge: ${mb.name}, UserBadge: ${
-            userBadge ? userBadge.badge.name : "N/A"
-          }`
-        );
-        console.log(
-          `Milestone Badge: ${mb.name}, isEarned: ${!!userBadge}, earnedAt: ${
-            userBadge?.earnedAt
-          }, isRedeemed: ${userBadge?.isRedeemed}, progress: ${
-            mb.code === "hero"
-              ? getBossDefeatedCount(userBadgesForEvent)
-              : leaderboardsForEvent?.reduce(
-                  (acc, lb) => acc + lb.totalCorrectAnswers,
-                  0
-                ) || 0
-          }`
         );
         return {
           id: mb.id,
@@ -141,19 +112,6 @@ const getAllUserBadges = async (req, res) => {
         const bossBadges = achievementBadges.map((ab) => {
           const userBadge = userBadgesForBoss.find(
             (ub) => ub.badgeId === ab.id
-          );
-          console.log(
-            `Achievement Badge: ${ab.name}, UserBadge: ${
-              userBadge ? userBadge.badge.name : "N/A"
-            }`
-          );
-          console.log("User Badge: ", userBadge);
-          console.log(
-            `Achievement Badge: ${
-              ab.name
-            }, isEarned: ${!!userBadge}, earnedAt: ${
-              userBadge?.earnedAt
-            }, isRedeemed: ${userBadge?.isRedeemed}`
           );
           return {
             id: ab.id,
