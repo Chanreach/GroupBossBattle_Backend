@@ -30,6 +30,8 @@ import "./schedulers/event-boss-status-updater.js";
 import "./schedulers/cleanup-inactive-guests.js";
 import setupSocket from "./socket2/index.js";
 
+import "./utils/logger.js";
+
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;

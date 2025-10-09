@@ -1,0 +1,5 @@
+[2025-10-09T16:22:01.992Z] [dotenv@17.1.0] injecting env (0) from .env [2m(tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' })[0m
+[2025-10-09T16:22:02.000Z] Server is running on http://localhost:3000
+[2025-10-09T16:22:02.165Z] New user connected: gR55au2T1JfaWUYjAAAD
+[2025-10-09T16:22:02.168Z] New user connected: VmiCX7QGWfYuj3GwAAAE
+[2025-10-09T16:22:02.170Z] New user connected: aaMJt9kKtzfgqnlzAAAF
