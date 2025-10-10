@@ -1,579 +1,169 @@
-import {
-  EventBoss,
-  Boss,
-  Category,
-  Question,
-  AnswerChoice,
-  Event,
-} from "../../models/index.js";
-import bossSessionManager from "../managers/boss-session.manager.js";
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
 import { GAME_CONSTANTS } from "../../utils/game.constants.js";
+import matchmakingManager from "../../managers/matchmaking.manager.js";
+import battleSessionManager from "../../managers/battle-session.manager.js";
 
 const handleMatchmaking = (io, socket) => {
-  socket.on("boss-preview:join", async (data) => {
-    try {
-      const { eventBossId, joinCode } = data;
+  socket.on(SOCKET_EVENTS.BATTLE_QUEUE.JOIN, async (payload) => {
+    const { eventBossId, playerInfo } = payload;
 
-      if (!eventBossId || !joinCode) {
-        socket.emit("error", { message: "Missing required data" });
-        return;
-      }
-      const boss = await EventBoss.findOne({
-        where: { id: eventBossId, joinCode },
+    if (!eventBossId || !playerInfo) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: "Invalid eventBossId or playerInfo.",
       });
-      if (!boss) {
-        socket.emit("error", { message: "Boss not found" });
-        return;
-      }
-
-      socket.join(`boss-${eventBossId}`);
-      socket.join(`boss-preview-${eventBossId}`); // Separate room for preview updates
-
-      // Get current session data and send to the new viewer
-      const session = bossSessionManager.getSession(eventBossId);
-      const sessionData = session
-        ? {
-            eventBossId: session.eventBossId,
-            bossData: session.bossData,
-            playersNeededToStart:
-              GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED - session.players.size,
-            playerCount: session.players.size,
-            isStarted: session.isStarted,
-            canStart: bossSessionManager.canStartBattle(eventBossId),
-          }
-        : {
-            eventBossId: eventBossId,
-            bossData: null,
-            playersNeededToStart: GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED,
-            playerCount: 0,
-            isStarted: false,
-            canStart: false,
-          };
-
-      socket.emit("boss-preview:joined", {
-        message: "Successfully joined boss preview",
-        session: sessionData,
-      });
-
-      // Send initial leaderboard data
-      try {
-        const leaderboardData =
-          await bossSessionManager.getComprehensiveLeaderboardData(eventBossId);
-        socket.emit("boss-preview:leaderboard-update", {
-          leaderboardData: leaderboardData,
-        });
-      } catch (leaderboardError) {
-        console.error(
-          "Error sending initial leaderboard data:",
-          leaderboardError
-        );
-      }
-    } catch (error) {
-      console.error("Error in boss-preview:join:", error);
-      socket.emit("error", { message: "Internal server error" });
+      return;
     }
-  });
 
-  // Request leaderboard data explicitly
-  socket.on("boss-preview:request-leaderboard", async (data) => {
     try {
-      const { eventBossId } = data;
-
-      if (!eventBossId) {
-        socket.emit("error", { message: "Missing eventBossId" });
-        return;
-      }
-
-      const leaderboardData =
-        await bossSessionManager.getComprehensiveLeaderboardData(eventBossId);
-      socket.emit("boss-preview:leaderboard-update", {
-        leaderboardData: leaderboardData,
-      });
-    } catch (error) {
-      console.error("Error handling leaderboard request:", error);
-      socket.emit("error", { message: "Failed to get leaderboard data" });
-    }
-  });
-
-  // Leave boss preview
-  socket.on("boss-preview:leave", (data) => {
-    try {
-      const { eventBossId } = data || {};
-      if (eventBossId) {
-        socket.leave(`boss-${eventBossId}`);
-        socket.leave(`boss-preview-${eventBossId}`);
-      }
-    } catch (error) {
-      console.error("Error in boss-preview:leave:", error);
-    }
-  });
-
-  socket.on("boss-fight:join", async (data) => {
-    try {
-      const { eventBossId, joinCode, playerData } = data;
-
-      console.log(
-        `🔍 [DEBUG] boss-fight:join received playerData:`,
-        playerData
-      );
-
-      if (!eventBossId || !joinCode || !playerData) {
-        socket.emit("error", { message: "Missing required data" });
-        return;
-      }
-
-      // Get boss information including categories and their questions
-      const boss = await EventBoss.findOne({
-        where: { id: eventBossId, joinCode },
-        include: [
-          {
-            model: Boss,
-            as: "boss",
-            include: [
-              {
-                model: Category,
-                as: "Categories",
-                include: [
-                  {
-                    model: Question,
-                    as: "questions",
-                    include: [
-                      {
-                        model: AnswerChoice,
-                        as: "answerChoices",
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            model: Event,
-            as: "event",
-          },
-        ],
-      });
-      console.log("Boss data fetched:", boss);
-      if (!boss) {
-        socket.emit("error", { message: "Boss not found" });
-        return;
-      }
-
-      // Extract questions and answer choices
-      const questionsData = boss.boss.Categories.map((category) => ({
-        categoryId: category.id,
-        categoryName: category.name,
-        questions: category.questions.map((question) => ({
-          questionId: question.id,
-          questionText: question.questionText,
-          timeLimit: question.timeLimit,
-          answerChoices: question.answerChoices.map((choice) => ({
-            choiceId: choice.id,
-            choiceText: choice.choiceText,
-            isCorrect: choice.isCorrect,
-          })),
-        })),
-      }));
-
-      const bossData = {
-        id: boss.id,
-        name: boss.boss.name,
-        cooldownDuration: boss.cooldownDuration,
-        numberOfTeams: boss.numberOfTeams,
-        eventId: boss.eventId, // Add the missing eventId!
-        questionsData: questionsData,
-      };
-
-      console.log(
-        `🔍 [DEBUG] Creating boss session with eventId: ${boss.eventId}`
-      );
-
-      // Create or get session
-      const session = bossSessionManager.createSession(eventBossId, bossData);
-      if (!session) {
-        socket.emit("nickname-check-response", {
-          success: false,
-          message: "Boss session not found",
+      if (matchmakingManager.isNicknameTaken(eventBossId, playerInfo.nickname)) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Nickname is already taken.",
         });
         return;
       }
-
-      // Check nickname uniqueness
-      if (
-        !bossSessionManager.isNicknameUnique(eventBossId, playerData.nickname)
-      ) {
-        socket.emit("nickname-check-response", {
-          success: false,
-          message:
-            "This nickname is already taken in this session. Please choose a different one.",
-        });
-        return;
-      }
-
-      // Add player to session
-      const result = await bossSessionManager.addPlayer(
+      
+      const data = await matchmakingManager.addPlayerToQueue(
         eventBossId,
-        socket.id,
-        playerData
+        playerInfo,
+        socket.id
       );
-
-      if (!result) {
-        socket.emit("nickname-check-response", {
-          success: false,
-          message: "Failed to join session",
+      if (!data) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Failed to join the battle queue.",
         });
         return;
       }
 
-      socket.join(`boss-${eventBossId}`);
-
-      // Send success response
-      socket.emit("nickname-check-response", {
-        success: true,
-        message: "Successfully joined boss fight",
+      socket.join(SOCKET_ROOMS.BATTLE_QUEUE(eventBossId));
+      socket.emit(SOCKET_EVENTS.BATTLE_QUEUE.JOINED, {
+        message: "Successfully joined the battle queue.",
+        data,
       });
+      socket.broadcast
+        .to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId))
+        .emit(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.UPDATED, { data });
 
-      socket.emit("boss-fight:joined", {
-        message: "Successfully joined boss fight",
-        player: {
-          id: result.player.id,
-          nickname: result.player.nickname,
-          userId: result.player.userId,
-          username: result.player.username,
-          isGuest: result.player.isGuest,
-          hearts: result.player.hearts,
-          status: result.player.status,
-          teamId: result.player.teamId,
-        },
-        session: {
-          eventBossId: session.eventBossId,
-          bossData: session.bossData,
-          playersNeededToStart:
-            GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED - session.players.size,
-          playerCount: session.players.size,
-          isStarted: session.isStarted,
-          canStart: bossSessionManager.canStartBattle(eventBossId),
-        },
-      });
-
-      io.to(`boss-${eventBossId}`).emit("player-count:updated", {
-        session: {
-          eventBossId: session.eventBossId,
-          bossData: session.bossData,
-          playersNeededToStart:
-            GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED - session.players.size,
-          playerCount: session.players.size,
-          isStarted: session.isStarted,
-          canStart: bossSessionManager.canStartBattle(eventBossId),
-        },
-        player: result.player,
-      });
-
-      if (session.isStarted) {
-        socket.emit("battle:already-started", {
-          message: "Battle has already started",
-          session: {
-            eventBossId: session.eventBossId,
-            bossData: session.bossData,
-            teams: Array.from(session.teams.values()).map((team) => ({
-              id: team.id,
-              name: team.name,
-              playerCount: team.players.size,
-              totalDamage: team.totalDamage,
-            })),
-            players: Array.from(session.players.values()).map((p) => ({
-              id: p.id,
-              nickname: p.nickname,
-              teamId: p.teamId,
-              hearts: p.hearts,
-              status: p.status,
-            })),
-          },
-        });
-
-        // Send team information for mid-game join ONLY
-        if (result.player.teamId) {
-          bossSessionManager.sendTeamInfoToPlayer(
-            io,
-            eventBossId,
-            result.player.id,
-            "mid-game-join-preview"
-          );
-        }
-
-        // Send current battle status to the new player for immediate HP sync
-        socket.emit("battle-status-sync", {
-          bossCurrentHp: session.bossData.currentHp,
-          bossMaxHp: session.bossData.maxHp,
-          bossHpPercentage: (
-            (session.bossData.currentHp / session.bossData.maxHp) *
-            100
-          ).toFixed(1),
-        });
-
-        // **NEW: Notify all other players about the new player joining**
-        const team = session.teams.get(result.player.teamId);
-        socket.to(`boss-${eventBossId}`).emit("player:joined-battle", {
-          message: `${result.player.nickname} joined the battle and increased boss HP!`,
-          playerNickname: result.player.nickname,
-          teamName: team?.name || `Team ${result.player.teamId}`,
-          bossCurrentHp: session.bossData.currentHp,
-          bossMaxHp: session.bossData.maxHp,
-        });
-
-        return;
-      }
-
-      // Check if there are enough players to start the battle
-      if (bossSessionManager.canStartBattle(eventBossId)) {
-        console.log(
-          "🎮 =============== BATTLE START CONDITION CHECK ==============="
-        );
-        console.log(
-          `✅ Minimum players met: ${session.players.size}/${GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED}`
-        );
-        console.log(`🔄 Session started: ${session.isStarted}`);
-        console.log(
-          `❄️ Cooldown status: ${
-            session.bossData.cooldownUntil ? "Active" : "None"
-          }`
-        );
-
-        // Notify players that countdown has started
-        io.to(`boss-${eventBossId}`).emit("battle:countdown-started", {
-          message: "Battle countdown started! Get ready!",
-          eventBossId: eventBossId,
-        });
-        console.log("🚀 Starting battle now...");
-
-        // Start the battle
-        const battleStartResult = await bossSessionManager.startBossFight(
-          eventBossId
-        );
-
-        if (battleStartResult && battleStartResult.success) {
-          // Prepare session data for battle:start event
-          const battleStartData = {
-            session: {
-              eventBossId: session.eventBossId,
-              bossData: session.bossData,
-              teams: Array.from(session.teams.values()).map((team) => ({
-                id: team.id,
-                name: team.name,
-                playerCount: team.players.size,
-                totalDamage: team.totalDamage,
-              })),
-              players: Array.from(session.players.values()).map((p) => ({
-                id: p.id,
-                nickname: p.nickname,
-                teamId: p.teamId,
-                hearts: p.hearts,
-                status: p.status,
-              })),
+      if (data.isBattleStarted) {
+        io.to(SOCKET_ROOMS.BATTLE_QUEUE(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.COUNTDOWN,
+          {
+            message: "Battle is starting!",
+            data: {
+              battleSessionId: data.battleSessionId,
+              countdownEndTime: Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN,
             },
-          };
-
-          // Notify all players that battle has started
-          io.to(`boss-${eventBossId}`).emit("battle:start", battleStartData);
-
-          // Notify all players in the boss preview room about status change
-          io.to(`boss-${eventBossId}`).emit("boss-status:updated", {
-            status: "in-battle",
-            eventBossId: eventBossId,
-          });
-
-          // Use centralized team info sending
-          bossSessionManager.sendTeamInfoToAllPlayers(
-            io,
-            eventBossId,
-            "battle-start"
-          );
-        }
-      } else {
-        console.log(
-          "⏳ =============== BATTLE START REQUIREMENT NOT MET ==============="
+          }
         );
-        console.log(
-          `❌ Current players: ${session.players.size}/${GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED}`
+
+        io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+          SOCKET_EVENTS.BOSS_STATUS.UPDATED,
+          {
+            data: {
+              eventBoss: battleSessionManager.getEventBoss(eventBossId),
+            },
+          }
         );
-        console.log(`🔄 Session started: ${session.isStarted}`);
-        console.log(
-          `❄️ Cooldown status: ${
-            session.bossData.cooldownUntil ? "Active" : "None"
-          }`
+
+        io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.SIZE.UPDATED,
+          {
+            data: {
+              sessionSize:
+                battleSessionManager.getBattleSessionSize(eventBossId),
+            },
+          }
         );
-        console.log("⏳ Waiting for more players...");
+
+        io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.UPDATED,
+          {
+            data: {
+              queueSize: 0,
+              isBattleStarted: true,
+            },
+          }
+        );
+
+        io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.START,
+          {
+            message: "Battle has started!",
+            data: {
+              eventBoss: battleSessionManager.getEventBoss(eventBossId),
+              battleState: battleSessionManager.getBattleState(eventBossId),
+              activePlayers:
+                battleSessionManager.getActivePlayersCount(eventBossId),
+              leaderboard: await battleSessionManager.getPreviewLiveLeaderboard(
+                eventBossId
+              ),
+            },
+          }
+        );
       }
     } catch (error) {
-      console.error("Error in boss-fight:join:", error);
-      socket.emit("error", { message: "Internal server error" });
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: error.message || "Internal server error.",
+      });
     }
   });
 
-  // **NEW: Handle player reconnection**
-  socket.on("boss-fight:reconnect", async (data) => {
+  socket.on(SOCKET_EVENTS.BATTLE_QUEUE.LEAVE, (payload) => {
+    const { eventBossId, playerId } = payload;
+
+    if (!eventBossId || !playerId) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: "Invalid eventBossId or playerId.",
+      });
+      return;
+    }
+
     try {
-      const { eventBossId, joinCode, userInfo } = data;
-
-      if (!eventBossId || !joinCode || !userInfo) {
-        socket.emit("error", { message: "Missing required data" });
-        return;
-      }
-
-      // Verify boss exists
-      const boss = await EventBoss.findOne({
-        where: { id: eventBossId, joinCode },
-      });
-      if (!boss) {
-        socket.emit("error", { message: "Boss not found" });
-        return;
-      }
-
-      // Attempt reconnection
-      const reconnectResult = bossSessionManager.reconnectPlayer(
+      const data = matchmakingManager.removePlayerFromQueue(
         eventBossId,
-        socket.id,
-        userInfo
+        playerId
       );
-
-      if (reconnectResult && reconnectResult.success) {
-        // **JOIN SOCKET ROOM**
-        socket.join(`boss-${eventBossId}`);
-
-        // Send reconnection success with full session data
-        socket.emit("boss-fight:reconnected", {
-          message: "Successfully reconnected to boss fight",
-          session: {
-            eventBossId: reconnectResult.session.eventBossId,
-            bossData: reconnectResult.session.bossData,
-            isStarted: reconnectResult.session.isStarted,
-            playerCount: reconnectResult.session.players.size,
-            teams: Array.from(reconnectResult.session.teams.values()).map(
-              (team) => ({
-                id: team.id,
-                name: team.name,
-                playerCount: team.players.size,
-                totalDamage: team.totalDamage,
-              })
-            ),
-            players: Array.from(reconnectResult.session.players.values()).map(
-              (p) => ({
-                id: p.id,
-                nickname: p.nickname,
-                teamId: p.teamId,
-                hearts: p.hearts,
-                status: p.status,
-              })
-            ),
-          },
-          player: {
-            id: reconnectResult.player.id,
-            nickname: reconnectResult.player.nickname,
-            teamId: reconnectResult.player.teamId,
-            hearts: reconnectResult.player.hearts,
-            status: reconnectResult.player.status,
-          },
+      if (!data) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Failed to leave the battle queue.",
         });
-
-        // Send team info if player has been assigned to a team
-        if (reconnectResult.player.teamId) {
-          bossSessionManager.sendTeamInfoToPlayer(
-            io,
-            eventBossId,
-            reconnectResult.player.id,
-            "reconnect"
-          );
-        }
-
-        // Notify other players about the reconnection
-        socket.to(`boss-${eventBossId}`).emit("player-reconnected", {
-          player: {
-            nickname: reconnectResult.player.nickname,
-            teamId: reconnectResult.player.teamId,
-          },
-          playerCount: reconnectResult.session.players.size,
-        });
-      } else {
-        // Silent fail - don't emit error for failed reconnection attempts
+        return;
       }
+
+      socket.leave(SOCKET_ROOMS.BATTLE_QUEUE(eventBossId));
+      socket.emit(SOCKET_EVENTS.BATTLE_QUEUE.LEFT, {
+        message: SOCKET_MESSAGES.BATTLE_QUEUE.LEFT,
+        data,
+      });
+      socket.broadcast
+        .to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId))
+        .emit(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.UPDATED, { data });
     } catch (error) {
-      console.error("Error in boss-fight:reconnect:", error);
-      // Silent fail for reconnection errors
-    }
-  });
-
-  // Player leaves the session
-  socket.on("leave-boss-session", () => {
-    const playerSession = bossSessionManager.getPlayerSession(socket.id);
-    if (playerSession) {
-      const { eventBossId } = playerSession;
-
-      // Leave socket room
-      socket.leave(`boss-${eventBossId}`);
-
-      // Remove player from session
-      const removedPlayer = bossSessionManager.removePlayer(socket.id);
-
-      // Notify remaining players about updated count
-      const session = bossSessionManager.getSession(eventBossId);
-      if (session) {
-        io.to(`boss-${eventBossId}`).emit("player-count:updated", {
-          session: {
-            eventBossId: session.eventBossId,
-            bossData: session.bossData,
-            playersNeededToStart:
-              GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED - session.players.size,
-            playerCount: session.players.size,
-            isStarted: session.isStarted,
-            canStart: bossSessionManager.canStartBattle(eventBossId),
-          },
-        });
-      }
-
-      socket.emit("left-boss-session", {
-        success: true,
-        message: "Successfully left boss session",
-      });
-    } else {
-      socket.emit("left-boss-session", {
-        success: false,
-        message: "No active session found",
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: error.message || "Internal server error.",
       });
     }
   });
 
-  // Handle disconnect
-  socket.on("disconnect", () => {
-    const playerSession = bossSessionManager.getPlayerSession(socket.id);
-    if (playerSession) {
-      const { eventBossId, nickname } = playerSession;
+  socket.on(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.REQUEST, (payload) => {
+    const { eventBossId } = payload;
 
-      // Remove player from session
-      bossSessionManager.removePlayer(socket.id);
+    if (!eventBossId) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: "Invalid eventBossId.",
+      });
+      return;
+    }
 
-      // Notify remaining players
-      const session = bossSessionManager.getSession(eventBossId);
-      if (session) {
-        io.to(`boss-${eventBossId}`).emit("player-disconnected", {
-          nickname,
-          playerCount: session.players.size,
-          canStart: bossSessionManager.canStartBattle(eventBossId),
-        });
-
-        // Also emit player-count:updated for consistency
-        io.to(`boss-${eventBossId}`).emit("player-count:updated", {
-          session: {
-            eventBossId: session.eventBossId,
-            bossData: session.bossData,
-            playersNeededToStart:
-              GAME_CONSTANTS.MINIMUM_PLAYERS_REQUIRED - session.players.size,
-            playerCount: session.players.size,
-            isStarted: session.isStarted,
-            canStart: bossSessionManager.canStartBattle(eventBossId),
-          },
-        });
-      }
+    try {
+      const queueSize = matchmakingManager.getQueueSize(eventBossId);
+      socket.emit(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.RESPONSE, {
+        message: "Successfully fetched queue size.",
+        data: { queueSize },
+      });
+    } catch (error) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: error.message || "Internal server error.",
+      });
     }
   });
 };

@@ -28,7 +28,7 @@ import heartBeatRoutes from "./routes/heartbeat.routes.js";
 import "./schedulers/event-status-updater.js";
 import "./schedulers/event-boss-status-updater.js";
 import "./schedulers/cleanup-inactive-guests.js";
-import setupSocket from "./socket2/index.js";
+import setupSocket from "./socket/index.js";
 
 import "./utils/logger.js";
 

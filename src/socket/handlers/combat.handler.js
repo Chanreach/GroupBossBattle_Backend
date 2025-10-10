@@ -1,907 +1,227 @@
-import bossSessionManager from "../managers/boss-session.manager.js";
-import { formatRevivalCodeForDisplay } from "../../utils/generateRevivalCode.js"; // **FIXED: Import at top of file**
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
+import battleSessionManager from "../../managers/battle-session.manager.js";
+import { GAME_CONSTANTS } from "../../utils/game.constants.js";
 
 const handleCombat = (io, socket) => {
-  // Handle join-boss event (for direct battle joining)
-  socket.on("join-boss", async (data) => {
+  socket.on(SOCKET_EVENTS.BATTLE_SESSION.QUESTION.REQUEST, (payload) => {
+    const { eventBossId, playerId } = payload;
+
+    if (!eventBossId || !playerId) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: "Invalid eventBossId or playerId.",
+      });
+      return;
+    }
+
     try {
-      const { eventBossId, playerName } = data;
-
-      // Check if session exists, if not create one for testing
-      let session = bossSessionManager.getSession(eventBossId);
-      if (!session) {
-        console.log("🔧 Creating new session for testing...");
-        // Create a test session
-        session = bossSessionManager.createSession(eventBossId, {
-          name: "Test Boss",
-          maxHp: 10,
-          currentHp: 10, // Set initial HP to full
-          numberOfTeams: 2,
-          eventId: "test-event-" + eventBossId, // Add eventId for milestone tracking
-          // Add other boss data as needed
-        });
-        console.log(`🔧 Test session created with eventId: ${session.eventId}`);
-      }
-
-      // Start the session if it's not started
-      if (!session.isStarted) {
-        console.log("🔧 Starting session for testing...");
-        const startResult = await bossSessionManager.startBossFight(
-          eventBossId
-        );
-        console.log("Start result:", startResult);
-      }
-
-      // Add player to session
-      const result = await bossSessionManager.addPlayer(
+      const currentQuestion = battleSessionManager.getNextQuestionForPlayer(
         eventBossId,
-        socket.id,
-        {
-          nickname: playerName || `Player_${socket.id.substring(0, 6)}`,
-          // Additional player data as needed
-        }
+        playerId
       );
-
-      console.log("🔧 Add player result:", {
-        success: !!result,
-        playerId: result?.player?.id,
-        playerNickname: result?.player?.nickname,
-      });
-
-      if (result && result.player) {
-        // Join the socket room
-        socket.join(`boss-${eventBossId}`);
-
-        console.log("✅ Player successfully joined battle");
-        socket.emit("boss-joined", {
-          message: "Successfully joined battle",
-          playerId: result.player.id,
-          sessionData: result.session,
+      if (!currentQuestion) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "No more questions available.",
         });
-
-        // Send team info ONLY if this is a mid-game join (battle already started)
-        if (result.session.isStarted && result.player.teamId) {
-          bossSessionManager.sendTeamInfoToPlayer(
-            io,
-            eventBossId,
-            result.player.id,
-            "mid-game-join"
-          );
-        }
-      } else {
-        console.log("❌ Failed to add player to session");
-        socket.emit("join-error", { message: "Failed to join battle" });
+        return;
       }
+
+      socket.emit(SOCKET_EVENTS.BATTLE_SESSION.QUESTION.NEXT, {
+        data: { currentQuestion },
+      });
     } catch (error) {
-      console.error("Error in join-boss:", error);
-      socket.emit("join-error", { message: "Internal server error" });
+      console.log(error);
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: error.message || "Internal server error.",
+      });
     }
   });
 
-  // Debug: Check player session
-  socket.on("check-player-session", (data) => {
-    try {
-      const { eventBossId } = data;
-      const playerSession = bossSessionManager.getPlayerSession(socket.id);
-      const session = bossSessionManager.getSession(eventBossId);
+  socket.on(SOCKET_EVENTS.BATTLE_SESSION.ANSWER.SUBMIT, async (payload) => {
+    const { eventBossId, playerId, choiceIndex, responseTime } = payload;
 
-      console.log("🔍 Session debug requested:", {
-        socketId: socket.id,
-        eventBossId,
-        playerSession,
-        sessionExists: !!session,
-        sessionStatus: session
-          ? {
-              isStarted: session.isStarted,
-              playerCount: session.players.size,
-              questionPoolsCount: session.questionPools.size,
-            }
-          : null,
+    if (
+      !eventBossId ||
+      !playerId ||
+      choiceIndex === undefined ||
+      responseTime === undefined
+    ) {
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: "Invalid eventBossId, playerId, choiceIndex, or responseTime.",
       });
-
-      socket.emit("session-debug", {
-        socketId: socket.id,
-        eventBossId,
-        playerSession,
-        sessionExists: !!session,
-        sessionStatus: session
-          ? {
-              isStarted: session.isStarted,
-              playerCount: session.players.size,
-              questionPoolsCount: session.questionPools.size,
-            }
-          : null,
-      });
-    } catch (error) {
-      console.error("Error in check-player-session:", error);
-      socket.emit("session-debug", { error: error.message });
+      return;
     }
-  });
 
-  // Request a new question
-  socket.on("question:request", async (data) => {
     try {
-      const { eventBossId } = data;
-      const playerSession = bossSessionManager.getPlayerSession(socket.id);
-
-      if (!playerSession || playerSession.eventBossId !== eventBossId) {
-        socket.emit("error", { message: "Player session not found" });
-        return;
-      }
-
-      const session = bossSessionManager.getSession(eventBossId);
-      if (!session || !session.isStarted) {
-        socket.emit("error", { message: "Battle not active" });
-        return;
-      }
-
-      const player = session.players.get(playerSession.playerId);
-
-      if (!player) {
-        socket.emit("error", { message: "Player not found in session" });
-        return;
-      }
-
-      if (player.isKnockedOut) {
-        socket.emit("error", { message: "Player is knocked out" });
-        return;
-      }
-
-      // Get next question from player's pre-assigned question pool
-      const questionData = bossSessionManager.getNextQuestionForPlayer(
+      const response = await battleSessionManager.processPlayerAnswer(
         eventBossId,
-        playerSession.playerId
+        playerId,
+        choiceIndex,
+        responseTime
       );
-
-      if (!questionData) {
-        socket.emit("error", { message: "No more questions available" });
-        return;
-      }
-
-      // Send question with current boss HP and battle status
-      socket.emit("question:received", {
-        question: questionData,
-        battleStatus: getBattleStatusWithTeamName(session, player),
-      });
-    } catch (error) {
-      console.error("Error in request-question:", error);
-      socket.emit("error", { message: "Internal server error" });
-    }
-  });
-
-  // Submit answer to question
-  socket.on("submit-answer", async (data) => {
-    try {
-      const { eventBossId, questionId, choiceIndex, responseTime } = data;
-      const playerSession = bossSessionManager.getPlayerSession(socket.id);
-
-      if (!playerSession || playerSession.eventBossId !== eventBossId) {
-        socket.emit("error", { message: "Player session not found" });
-        return;
-      }
-
-      const session = bossSessionManager.getSession(eventBossId);
-      if (!session || !session.isStarted) {
-        socket.emit("error", { message: "Battle not active" });
-        return;
-      }
-
-      const player = session.players.get(playerSession.playerId);
-      if (!player || player.isKnockedOut) {
-        socket.emit("error", { message: "Player cannot submit answer" });
-        return;
-      }
-
-      // Get the question for this player
-      const questionData = session.questions.get(playerSession.playerId);
-
-      if (!questionData || questionData.id !== questionId) {
-        socket.emit("error", { message: "Invalid question" });
-        return;
-      }
-
-      // Question validation completed
-
-      // Check if time limit exceeded or explicit timeout
-      const timeTaken = responseTime || Date.now() - questionData.startTime;
-
-      // FIXED: Ensure timeLimit is in milliseconds for comparison
-      const timeLimitMs = questionData.timeLimit * 1000; // Convert seconds to milliseconds
-      const isTimeout = parseInt(choiceIndex) === -1 || timeTaken > timeLimitMs;
-
-      if (isTimeout) {
-        console.log("⏰ TIMEOUT DETECTED:");
-        console.log("   Choice Index:", choiceIndex);
-        console.log("   Time Taken:", timeTaken + "ms");
-        console.log("   Time Limit (seconds):", questionData.timeLimit);
-        console.log("   Time Limit (milliseconds):", timeLimitMs);
-        console.log(
-          "   Is Explicit Timeout (choiceIndex -1):",
-          parseInt(choiceIndex) === -1
-        );
-        console.log(
-          "   Timeout reason:",
-          parseInt(choiceIndex) === -1
-            ? "Explicit timeout"
-            : timeTaken > timeLimitMs
-            ? "Time exceeded"
-            : "Unknown"
-        );
-
-        socket.emit("answer-result", {
-          isCorrect: false,
-          message:
-            parseInt(choiceIndex) === -1 ? "Time's up!" : "Time limit exceeded",
-          timeTaken,
-          battleStatus: getBattleStatusWithTeamName(session, player),
+      if (!response) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Failed to process answer. Please try again.",
         });
+        return;
+      }
+      
+      const {
+        answerResult,
+        isPlayerKnockedOut,
+        isEventBossDefeated,
+        playerBadge,
+      } = response;
+      if (!answerResult) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "Failed to submit answer. Please try again.",
+        });
+        return;
+      }
 
-        // Process as incorrect answer (lose heart) - should only lose 1 heart
-        console.log(
-          "💔 =============== TIMEOUT HEART DEDUCTION DEBUG ==============="
-        );
-        console.log(`🎯 Player: ${player.nickname} (${player.teamId})`);
-        console.log(
-          `⏱️  Question Time Limit: ${questionData.timeLimit} seconds (${
-            questionData.timeLimit * 1000
-          } milliseconds)`
-        );
-        console.log(
-          `⚡ Response Time: ${timeTaken} milliseconds (${(
-            timeTaken / 1000
-          ).toFixed(2)} seconds)`
-        );
-        console.log(`💔 Hearts Before Processing: ${player.hearts}`);
-        console.log(
-          `⚠️  Reason: ${
-            parseInt(choiceIndex) === -1
-              ? "Explicit timeout"
-              : "Time limit exceeded"
-          }`
-        );
-        console.log(
-          "💔 =============================================================="
-        );
-
-        const result = bossSessionManager.processIncorrectAnswer(
-          eventBossId,
-          playerSession.playerId
-        );
-
-        console.log(
-          `💔 Hearts After Processing: ${result?.player?.hearts || "N/A"}`
-        );
-
-        if (result) {
-          // Send updated battle status after processing
-          socket.emit("battle-status-update", {
-            battleStatus: {
-              bossCurrentHp: session.bossData.currentHp,
-              bossMaxHp: session.bossData.maxHp,
-              playerHearts: result.player.hearts, // Send actual heart count after processing
-              playerTeamId: player.teamId,
-              isKnockedOut: result.isKnockedOut,
-            },
+      socket.emit(SOCKET_EVENTS.BATTLE_SESSION.ANSWER.RESULT, {
+        data: { answerResult },
+      });
+      if (answerResult.damage > 0) {
+        socket.broadcast
+          .to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId))
+          .emit(SOCKET_EVENTS.BATTLE_SESSION.BOSS.DAMAGED, {
+            data: { answerResult },
           });
 
-          handleIncorrectAnswerResult(io, eventBossId, result);
-        }
-        return; // **FIXED: Return here to prevent double processing**
-      }
-
-      // Check if answer is correct
-      const isCorrect =
-        parseInt(choiceIndex) === parseInt(questionData.correctAnswerIndex);
-
-      if (isCorrect) {
-        // **Use enhanced processAttack with response time-based damage**
-        const result = await bossSessionManager.processAttack(
-          eventBossId,
-          playerSession.playerId,
-          isCorrect,
-          timeTaken,
-          questionData.timeLimit,
-          null,
-          io
-        );
-
-        if (result) {
-          // ===== DAMAGE CALCULATION DEBUG =====
-          console.log(
-            "💥 =============== DAMAGE CALCULATION DEBUG ==============="
-          );
-          console.log(`🎯 Player: ${player.nickname} (${player.teamId})`);
-          console.log(
-            `⏱️  Question Time Limit: ${questionData.timeLimit} seconds (${
-              questionData.timeLimit * 1000
-            } milliseconds)`
-          );
-          console.log(
-            `⚡ Response Time: ${timeTaken} milliseconds (${(
-              timeTaken / 1000
-            ).toFixed(2)} seconds)`
-          );
-          console.log(`📊 Response Category: ${result.responseCategory}`);
-          console.log(`⚔️  Damage Dealt: ${result.damage}`);
-          console.log(
-            `🎮 Boss HP: ${result.bossCurrentHP}/${result.bossMaxHP} (${(
-              (result.bossCurrentHP / result.bossMaxHP) *
-              100
-            ).toFixed(1)}%)`
-          );
-          console.log(
-            "💥 ========================================================="
-          );
-
-          // **NEW: Check for real-time milestone badges after correct answer**
-          try {
-            console.log(
-              `🎖️ [MILESTONE CHECK] Player ${player.nickname} has ${result.player.correctAnswers} correct answers`
-            );
-
-            const newMilestoneBadges =
-              await bossSessionManager.checkAndAwardMilestoneBadges(
-                eventBossId,
-                playerSession.playerId,
-                result.player.correctAnswers
-              );
-
-            console.log(
-              `🎖️ [MILESTONE RESULT] Found ${newMilestoneBadges.length} new milestone badges for ${player.nickname}`
-            );
-
-            if (newMilestoneBadges.length > 0) {
-              // Store the badges in session for real-time notification
-              if (!session.realtimeBadges) {
-                session.realtimeBadges = [];
-              }
-              session.realtimeBadges.push(...newMilestoneBadges);
-
-              console.log(
-                `🎖️ ${newMilestoneBadges.length} milestone badge(s) ready for notification to ${player.nickname}`
-              );
-
-              // Debug what badges were found
-              newMilestoneBadges.forEach((badge) => {
-                console.log(
-                  `🎖️ [MILESTONE BADGE] ${badge.badgeName} (milestone: ${badge.milestone}) for ${badge.playerNickname}`
-                );
-              });
-            }
-          } catch (error) {
-            console.error(
-              "❌ [MILESTONE ERROR] Error checking milestone badges:",
-              error
-            );
-          }
-
-          // Send response to player with enhanced data
-          socket.emit("answer-result", {
-            isCorrect: true,
-            damage: result.damage,
-            responseCategory: result.responseCategory,
-            timeTaken,
-            battleStatus: {
-              bossCurrentHp: result.bossCurrentHP,
-              bossMaxHp: result.bossMaxHP,
-              playerHearts: player.hearts,
-              playerTeamId: player.teamId,
-              totalDamageDealt: result.player.totalDamage,
-            },
-            message: `Correct! You dealt ${result.damage} damage! (${result.responseCategory} response)`,
-          });
-
-          // **NEW: Check for real-time milestone badges after correct answer**
-          if (session.realtimeBadges && session.realtimeBadges.length > 0) {
-            // Send milestone badge notifications to the player who earned them
-            const playerMilestoneBadges = session.realtimeBadges.filter(
-              (badge) => badge.playerId === player.userId
-            );
-
-            if (playerMilestoneBadges.length > 0) {
-              playerMilestoneBadges.forEach((badge) => {
-                socket.emit("badge-earned", {
-                  type: "Milestone",
-                  badgeId: badge.badgeId,
-                  badgeName: badge.badgeName,
-                  message: `🎖️ Milestone achieved! You earned the "${badge.badgeName}" badge!`,
-                  milestone: badge.milestone,
-                  eventBossId: badge.eventBossId,
-                  isRealTime: true,
-                });
-
-                console.log(
-                  `🎖️ Sent real-time milestone badge notification: ${badge.badgeName} to ${badge.playerNickname}`
-                );
-              });
-            }
-
-            // Clear the real-time badges for this player to prevent duplicate notifications
-            session.realtimeBadges = session.realtimeBadges.filter(
-              (badge) => badge.playerId !== player.userId
-            );
-          }
-
-          // Broadcast attack to all players in session with enhanced data
-          io.to(`boss-${eventBossId}`).emit("player-attacked", {
-            playerNickname: player.nickname,
-            teamId: player.teamId,
-            damage: result.damage,
-            responseCategory: result.responseCategory,
-            responseTime: timeTaken,
-            bossCurrentHp: result.bossCurrentHP,
-            bossMaxHp: result.bossMaxHP,
-            bossHpPercentage: (
-              (result.bossCurrentHP / result.bossMaxHP) *
-              100
-            ).toFixed(1),
-            battleUpdate: {
-              totalDamageDealt: session.bossData.maxHp - result.bossCurrentHP,
-              questionsAnswered: Array.from(session.players.values()).reduce(
-                (sum, p) => sum + p.questionsAnswered,
-                0
+        const updateEventBoss = battleSessionManager.getEventBoss(eventBossId);
+        io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.BOSS.DAMAGED,
+          {
+            data: {
+              eventBoss: updateEventBoss,
+              leaderboard: await battleSessionManager.getPreviewLiveLeaderboard(
+                eventBossId
               ),
             },
-          });
-
-          // **NEW: Broadcast live leaderboard update after each attack**
-          bossSessionManager.broadcastLeaderboardUpdate(io, eventBossId);
-
-          // Check if boss was defeated
-          if (result.isBossDefeated) {
-            await handleBossDefeated(io, eventBossId, result);
           }
-        }
-      } else {
-        // **Incorrect answer - use enhanced processIncorrectAnswer**
-        console.log(
-          "❌ =============== INCORRECT ANSWER DEBUG ==============="
         );
-        console.log(`🎯 Player: ${player.nickname} (${player.teamId})`);
-        console.log(
-          `⏱️  Question Time Limit: ${questionData.timeLimit} seconds (${
-            questionData.timeLimit * 1000
-          } milliseconds)`
-        );
-        console.log(
-          `⚡ Response Time: ${timeTaken} milliseconds (${(
-            timeTaken / 1000
-          ).toFixed(2)} seconds)`
-        );
-        console.log(
-          `❌ Selected Answer: ${questionData.choices[choiceIndex]?.text}`
-        );
-        console.log(
-          `✅ Correct Answer: ${
-            questionData.choices[questionData.correctAnswerIndex]?.text
-          }`
-        );
-        console.log(
-          `💔 Hearts Before: ${player.hearts} → Hearts After: ${Math.max(
-            0,
-            player.hearts - 1
-          )}`
-        );
-        console.log(`⚔️  Damage Dealt: 0 (incorrect answer)`);
-        console.log(
-          "❌ ======================================================"
-        );
+      }
 
-        socket.emit("answer-result", {
-          isCorrect: false,
-          correctIndex: questionData.correctAnswerIndex,
-          correctAnswer: questionData.choices[questionData.correctAnswerIndex],
-          playerAnswer: questionData.choices[choiceIndex],
-          timeTaken,
-          battleStatus: {
-            bossCurrentHp: session.bossData.currentHp,
-            bossMaxHp: session.bossData.maxHp,
-            playerHearts: player.hearts, // Show current hearts, not preview
-            playerTeamId: player.teamId,
-          },
-          message: "Incorrect answer! You lost a heart.",
-        });
-
-        // Process incorrect answer (lose heart)
-        console.log(`💔 Hearts Before Processing: ${player.hearts}`);
-
-        const result = bossSessionManager.processIncorrectAnswer(
+      if (isPlayerKnockedOut) {
+        const knockoutInfo = battleSessionManager.getKnockedOutPlayerInfo(
           eventBossId,
-          playerSession.playerId
+          playerId
         );
-
-        console.log(
-          `💔 Hearts After Processing: ${result?.player?.hearts || "N/A"}`
-        );
-
-        if (result) {
-          // Send updated battle status after processing
-          socket.emit("battle-status-update", {
-            battleStatus: {
-              bossCurrentHp: session.bossData.currentHp,
-              bossMaxHp: session.bossData.maxHp,
-              playerHearts: result.player.hearts, // Send actual heart count after processing
-              playerTeamId: player.teamId,
-              isKnockedOut: result.isKnockedOut,
-            },
+        if (knockoutInfo) {
+          socket.emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.KNOCKED_OUT, {
+            message:
+              "You have been knocked out! Share your revival code with teammates.",
+            data: { knockoutInfo },
           });
-
-          handleIncorrectAnswerResult(io, eventBossId, result);
+          const { teamId } = battleSessionManager.getPlayerTeamInfo(
+            eventBossId,
+            playerId
+          );
+          socket.broadcast
+            .to(SOCKET_ROOMS.TEAM(eventBossId, teamId))
+            .emit(SOCKET_EVENTS.BATTLE_SESSION.TEAMMATE.KNOCKED_OUT, {
+              message: "A player has been knocked out!",
+            });
         }
       }
 
-      // Clear the question for this player
-      session.questions.delete(playerSession.playerId);
-    } catch (error) {
-      console.error("Error in submit-answer:", error);
-      socket.emit("error", { message: "Internal server error" });
-    }
-  });
-
-  // Get current battle status
-  socket.on("get-battle-status", (data) => {
-    try {
-      const { eventBossId } = data;
-      const session = bossSessionManager.getSession(eventBossId);
-
-      if (!session) {
-        socket.emit("error", { message: "Session not found" });
-        return;
+      if (playerBadge && playerBadge.badge) {
+        socket.emit(SOCKET_EVENTS.BADGE.EARNED, {
+          message: `Congratulations! You've earned the ${playerBadge.badge.name} badge for reaching a milestone of ${playerBadge.badge.threshold} correct answers!`,
+          data: {
+            playerBadge,
+          },
+        });
       }
 
-      socket.emit("battle-status", {
-        isStarted: session.isStarted,
-        bossData: session.bossData,
-        playerCount: session.players.size,
-        teams: Array.from(session.teams.values()).map((team) => ({
-          id: team.id,
-          name: team.name,
-          totalDamage: team.totalDamage,
-          playerCount: team.players.size,
-        })),
-      });
-    } catch (error) {
-      console.error("Error in get-battle-status:", error);
-      socket.emit("error", { message: "Internal server error" });
-    }
-  });
-
-  // **NEW: Handle request for current leaderboard data**
-  socket.on("request-leaderboard-data", (data) => {
-    try {
-      const playerSession = bossSessionManager.getPlayerSession(socket.id);
-      if (!playerSession) {
-        socket.emit("error", { message: "Player session not found" });
-        return;
-      }
-
-      const eventBossId = playerSession.eventBossId;
-      const leaderboardData =
-        bossSessionManager.generateLiveLeaderboard(eventBossId);
-
-      if (leaderboardData) {
-        socket.emit("leaderboard-update", leaderboardData);
-        console.log(
-          `📊 Sent current leaderboard data to ${playerSession.nickname}`
+      if (isEventBossDefeated) {
+        io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.ENDED,
+          {
+            message: "The event boss has been defeated!",
+            data: {
+              podiumEndTime:
+                battleSessionManager.getBattleSession(eventBossId)
+                  ?.podiumEndTime,
+            },
+          }
         );
-      } else {
-        socket.emit("error", { message: "No leaderboard data available" });
+
+        io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+          SOCKET_EVENTS.BOSS_PREVIEW.BATTLE_SESSION.ENDED,
+          {
+            message: "The event boss has been defeated!",
+            data: {
+              session: battleSessionManager.getBattleSession(eventBossId),
+            },
+          }
+        );
+
+        const updateEventBoss = battleSessionManager.getEventBoss(eventBossId);
+        io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+          SOCKET_EVENTS.BOSS_STATUS.UPDATED,
+          {
+            data: {
+              eventBoss: updateEventBoss,
+            },
+          }
+        );
+
+        const reactivatedTimeout = updateEventBoss.cooldownEndTime - Date.now();
+        setTimeout(async () => {
+          const reactivatedEventBoss =
+            await battleSessionManager.updateEventBossStatus(
+              eventBossId,
+              GAME_CONSTANTS.BOSS_STATUS.ACTIVE
+            );
+
+          io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+            SOCKET_EVENTS.BOSS_STATUS.UPDATED,
+            {
+              data: {
+                eventBoss: reactivatedEventBoss,
+              },
+            }
+          );
+
+          io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+            SOCKET_EVENTS.BATTLE_SESSION.SIZE.UPDATED,
+            {
+              data: {
+                sessionSize: 0,
+              },
+            }
+          );
+        }, reactivatedTimeout);
       }
+
+      io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
+        SOCKET_EVENTS.BATTLE_SESSION.LEADERBOARD.UPDATED,
+        {
+          data: {
+            leaderboard:
+              battleSessionManager.getBattleLiveLeaderboard(eventBossId),
+          },
+        }
+      );
+
+      io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+        SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.UPDATED,
+        {
+          data: {
+            leaderboard: await battleSessionManager.getPreviewLiveLeaderboard(
+              eventBossId
+            ),
+          },
+        }
+      );
     } catch (error) {
-      console.error("Error in request-leaderboard-data:", error);
-      socket.emit("error", { message: "Internal server error" });
+      console.log(error);
+      socket.emit(SOCKET_EVENTS.ERROR, {
+        message: error.message || "Internal server error.",
+      });
     }
   });
 };
-
-// Helper functions
-function getBattleStatusWithTeamName(session, player) {
-  const team = session.teams.get(player.teamId);
-  return {
-    bossCurrentHp: session.bossData.currentHp,
-    bossMaxHp: session.bossData.maxHp,
-    playerHearts: player.hearts,
-    playerTeamId: player.teamId,
-    playerTeamName: team?.name || `Team ${player.teamId}`, // **NEW: Include team name**
-    isKnockedOut: player.isKnockedOut,
-  };
-}
-
-function handleIncorrectAnswerResult(io, eventBossId, result) {
-  const { session, player, isKnockedOut, reviveCode } = result;
-
-  // Send heart loss specifically to the player who lost it
-  const playerSocket = io.sockets.sockets.get(player.socketId);
-  if (playerSocket) {
-    playerSocket.emit("player-lost-heart", {
-      playerNickname: player.nickname,
-      teamId: player.teamId,
-      hearts: player.hearts,
-      isKnockedOut,
-    });
-  }
-
-  // Also broadcast to all players for leaderboard updates
-  io.to(`boss-${eventBossId}`).emit("player-status-update", {
-    playerNickname: player.nickname,
-    teamId: player.teamId,
-    hearts: player.hearts,
-    isKnockedOut,
-  });
-
-  if (isKnockedOut) {
-    // Send revival code to knocked out player
-    if (playerSocket) {
-      playerSocket.emit("player-knocked-out", {
-        message: "You have been knocked out!",
-        reviveCode,
-        formattedReviveCode: formatRevivalCodeForDisplay(reviveCode), // **FIXED: Use ES import**
-        expiresIn: 60000, // 60 seconds
-      });
-    }
-
-    // **ENHANCED: Use the new team notification method**
-    console.log("🔔 Calling notifyTeamAboutKnockout for player:", player.id);
-    const notificationResult = bossSessionManager.notifyTeamAboutKnockout(
-      io,
-      eventBossId,
-      player.id
-    );
-    console.log("🔔 Team notification result:", notificationResult);
-  }
-}
-
-// **NEW: Handle player death when revival timer expires**
-function handlePlayerDeath(io, eventBossId, playerId) {
-  const session = bossSessionManager.getSession(eventBossId);
-  if (!session) return;
-
-  const player = session.players.get(playerId);
-  if (!player) return;
-
-  // Use the boss session manager to handle death
-  const deathResult = bossSessionManager.handlePlayerDeath(
-    eventBossId,
-    playerId
-  );
-
-  if (deathResult && deathResult.isDead) {
-    const playerSocket = io.sockets.sockets.get(player.socketId);
-    if (playerSocket) {
-      // Notify the dead player to return to boss preview
-      playerSocket.emit("player-died", {
-        message:
-          "Revival time expired. You are now permanently out of this battle.",
-        shouldRedirect: true,
-        redirectTo: "boss-preview",
-        eventBossId: eventBossId,
-      });
-    }
-
-    // Notify team members that the player is permanently dead
-    const team = session.teams.get(player.teamId);
-    if (team) {
-      team.players.forEach((teamPlayerId) => {
-        if (teamPlayerId !== playerId) {
-          const teamPlayer = session.players.get(teamPlayerId);
-          if (teamPlayer && teamPlayer.socketId) {
-            const teamPlayerSocket = io.sockets.sockets.get(
-              teamPlayer.socketId
-            );
-            if (teamPlayerSocket) {
-              teamPlayerSocket.emit("teammate-died", {
-                message: `${player.nickname} could not be revived and is permanently out of the battle.`,
-                deadPlayerNickname: player.nickname,
-                teamName: team.name,
-              });
-            }
-          }
-        }
-      });
-    }
-
-    console.log(
-      `Player ${player.nickname} permanently died in session ${eventBossId}`
-    );
-  }
-}
-
-async function handleBossDefeated(io, eventBossId, result) {
-  try {
-    // **GENERATE LEADERBOARDS BEFORE ENDING FIGHT** - This preserves team damage stats
-    console.log(
-      `🏆 Generating final leaderboards before ending boss fight ${eventBossId}`
-    );
-    const finalLeaderboards =
-      bossSessionManager.generateLiveLeaderboard(eventBossId);
-
-    // Log team damage for debugging
-    if (finalLeaderboards && finalLeaderboards.teamLeaderboard) {
-      console.log(
-        "🏆 Team damage captured:",
-        finalLeaderboards.teamLeaderboard.map((team) => ({
-          teamName: team.teamName,
-          totalDamage: team.totalDamage,
-        }))
-      );
-    }
-
-    const endResult = await bossSessionManager.endBossFight(
-      eventBossId,
-      result.finalHitBy,
-      io
-    );
-
-    if (endResult && endResult.session) {
-      const { session, winningTeam, mvpPlayer, cooldownUntil, awardedBadges } =
-        endResult;
-
-      // Broadcast boss defeated to all players with badge information
-      io.to(`boss-${eventBossId}`).emit("boss-defeated", {
-        message: "Boss defeated!",
-        winningTeam: winningTeam
-          ? {
-              id: winningTeam.id,
-              name: winningTeam.name,
-              totalDamage: winningTeam.totalDamage,
-            }
-          : null,
-        mvpPlayer: mvpPlayer
-          ? {
-              id: mvpPlayer.id,
-              nickname: mvpPlayer.nickname,
-              totalDamage: mvpPlayer.totalDamage,
-            }
-          : null,
-        finalHitBy: result.finalHitBy,
-        cooldownUntil,
-        nextBattleIn: cooldownUntil
-          ? Math.ceil((cooldownUntil - new Date()) / 1000)
-          : 0,
-        awardedBadges: awardedBadges
-          ? {
-              mvpAwarded: !!awardedBadges.mvp,
-              lastHitAwarded: !!awardedBadges.lastHit,
-              bossDefeatedCount: awardedBadges.bossDefeated.length,
-              milestoneAwards: awardedBadges.milestones.map((badge) => ({
-                playerId: badge.playerId,
-                playerNickname: badge.playerNickname,
-                badgeName: badge.name,
-                milestone: badge.milestone,
-              })),
-            }
-          : null,
-      });
-
-      // **BROADCAST PRE-GENERATED FINAL LEADERBOARDS** - Using data from before endBossFight
-      if (finalLeaderboards) {
-        io.to(`boss-${eventBossId}`).emit("final-leaderboards", {
-          ...finalLeaderboards,
-          eventBossId,
-          bossName: session.bossData.name || "Boss",
-          completedAt: new Date().toISOString(),
-          totalParticipants: session.players.size,
-          battleDuration: Math.floor((new Date() - session.startedAt) / 1000), // Duration in seconds
-        });
-        console.log(
-          `🏆 Final leaderboards broadcasted for session ${eventBossId}`
-        );
-      }
-
-      // Broadcast boss status update to cooldown
-      try {
-        const { EventBoss } = await import("../../models/index.js");
-        const eventBoss = await EventBoss.findByPk(eventBossId);
-
-        if (eventBoss && eventBoss.cooldownEndTime) {
-          io.to(`boss-${eventBossId}`).emit("boss-status:updated", {
-            status: "cooldown",
-            eventBossId: eventBossId,
-            cooldownEndTime: eventBoss.cooldownEndTime,
-          });
-        }
-      } catch (error) {
-        console.error("Error broadcasting boss status update:", error);
-      }
-
-      // Send individual badge notifications to players
-      if (awardedBadges) {
-        // Notify MVP
-        if (awardedBadges.mvp && mvpPlayer) {
-          const mvpSocket = io.sockets.sockets.get(mvpPlayer.socketId);
-          if (mvpSocket) {
-            mvpSocket.emit("badge-earned", {
-              type: "MVP",
-              badgeId: awardedBadges.mvp.badgeId,
-              badgeName: "MVP", // Explicit badge name
-              message: `🏆 Congratulations! You earned the MVP badge with ${mvpPlayer.totalDamage} damage!`,
-              eventBossId,
-            });
-          }
-        }
-
-        // Notify Last Hit player
-        if (awardedBadges.lastHit && result.finalHitBy) {
-          const finalHitPlayer = session.players.get(result.finalHitBy);
-          if (finalHitPlayer) {
-            const lastHitSocket = io.sockets.sockets.get(
-              finalHitPlayer.socketId
-            );
-            if (lastHitSocket) {
-              lastHitSocket.emit("badge-earned", {
-                type: "Last Hit",
-                badgeId: awardedBadges.lastHit.badgeId,
-                badgeName: "Last Hit", // Explicit badge name
-                message: "🎯 Congratulations! You earned the Last Hit badge!",
-                eventBossId,
-              });
-            }
-          }
-        }
-
-        // Notify Boss Defeated badge recipients
-        if (awardedBadges.bossDefeated.length > 0 && winningTeam) {
-          winningTeam.players.forEach((playerId) => {
-            const player = session.players.get(playerId);
-            if (player) {
-              const playerSocket = io.sockets.sockets.get(player.socketId);
-              if (playerSocket) {
-                playerSocket.emit("badge-earned", {
-                  type: "Boss Defeated",
-                  badgeId: awardedBadges.bossDefeated[0]?.badgeId, // Same badge for all
-                  badgeName: "Boss Defeated", // Explicit badge name
-                  message:
-                    "🏅 Congratulations! You earned the Boss Defeated badge!",
-                  eventBossId,
-                });
-              }
-            }
-          });
-        }
-
-        // Notify milestone badge recipients
-        awardedBadges.milestones.forEach((badge) => {
-          const player = session.players.get(badge.playerId);
-          if (player) {
-            const playerSocket = io.sockets.sockets.get(player.socketId);
-            if (playerSocket) {
-              playerSocket.emit("badge-earned", {
-                type: "Milestone",
-                badgeId: badge.id,
-                badgeName: badge.name,
-                message: `🎖️ Congratulations! You earned the ${badge.name} milestone badge!`,
-                milestone: badge.milestone,
-                eventBossId,
-                isBattleEnd: true, // Flag to indicate this is a battle-end notification
-              });
-            }
-          }
-        });
-      }
-
-      console.log(
-        `Boss ${eventBossId} defeated! Winning team: ${
-          winningTeam?.name || "None"
-        }, MVP: ${mvpPlayer?.nickname || "None"}`
-      );
-
-      if (awardedBadges) {
-        console.log(
-          `🎖️ Badges awarded: MVP(${!!awardedBadges.mvp}), LastHit(${!!awardedBadges.lastHit}), BossDefeated(${
-            awardedBadges.bossDefeated.length
-          }), Milestones(${awardedBadges.milestones.length})`
-        );
-      }
-    }
-  } catch (error) {
-    console.error("Error handling boss defeat:", error);
-
-    // Still broadcast boss defeated even if badge awarding fails
-    io.to(`boss-${eventBossId}`).emit("boss-defeated", {
-      message: "Boss defeated!",
-      error: "Badge awarding failed",
-    });
-  }
-}
 
 export default handleCombat;
