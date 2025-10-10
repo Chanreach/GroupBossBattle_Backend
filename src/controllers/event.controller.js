@@ -2,6 +2,7 @@ import { Event, User, Boss, EventBoss, Category } from "../models/index.js";
 import { Op } from "sequelize";
 import { generateUniqueJoinCode } from "../utils/generateJoinCode.js";
 import { generateBossJoinQRCode } from "../utils/qrCodeGenerator.js";
+import { getImageUrl } from "../utils/image.utils.js";
 
 // Helper function to update event status based on current time
 const updateEventStatus = (event) => {
@@ -67,7 +68,7 @@ const getAllEvents = async (req, res) => {
     });
 
     // Update status and format datetime for each event
-    const eventsWithStatus = await Promise.all(
+    let eventsWithStatus = await Promise.all(
       events.map(async (event) => {
         const currentStatus = updateEventStatus(event);
 
@@ -82,6 +83,21 @@ const getAllEvents = async (req, res) => {
         };
       })
     );
+
+    if (eventsWithStatus) {
+      eventsWithStatus = eventsWithStatus.map((event) => ({
+        ...event,
+        eventBosses: event.eventBosses.map((eb) => ({
+          ...eb,
+          boss: eb.boss
+            ? {
+                ...eb.boss,
+                image: eb.boss.image ? getImageUrl(eb.boss.image) : null,
+              }
+            : null,
+        })),
+      }));
+    }
 
     res.status(200).json(eventsWithStatus);
   } catch (error) {
@@ -148,6 +164,18 @@ const getEventById = async (req, res) => {
       ...event.toJSON(),
       status: currentStatus,
     };
+
+    if (eventWithStatus.eventBosses) {
+      eventWithStatus.eventBosses = eventWithStatus.eventBosses.map((eb) => ({
+        ...eb,
+        boss: eb.boss
+          ? {
+              ...eb.boss,
+              image: eb.boss.image ? getImageUrl(eb.boss.image) : null,
+            }
+          : null,
+      }));
+    }
 
     res.status(200).json(eventWithStatus);
   } catch (error) {
@@ -535,7 +563,7 @@ const getPublicEvents = async (req, res) => {
     });
 
     // Update status and format datetime for each event
-    const eventsWithStatus = await Promise.all(
+    let eventsWithStatus = await Promise.all(
       events.map(async (event) => {
         const currentStatus = updateEventStatus(event);
 
@@ -550,6 +578,21 @@ const getPublicEvents = async (req, res) => {
         };
       })
     );
+
+    if (eventsWithStatus) {
+      eventsWithStatus = eventsWithStatus.map((event) => ({
+        ...event,
+        eventBosses: event.eventBosses.map((eb) => ({
+          ...eb,
+          boss: eb.boss
+            ? {
+                ...eb.boss,
+                image: eb.boss.image ? getImageUrl(eb.boss.image) : null,
+              }
+            : null,
+        })),
+      }));
+    }
 
     res.status(200).json(eventsWithStatus);
   } catch (error) {
@@ -611,6 +654,18 @@ const getPublicEventById = async (req, res) => {
       ...event.toJSON(),
       status: currentStatus,
     };
+
+    if (eventWithStatus.eventBosses) {
+      eventWithStatus.eventBosses = eventWithStatus.eventBosses.map((eb) => ({
+        ...eb,
+        boss: eb.boss
+          ? {
+              ...eb.boss,
+              image: eb.boss.image ? getImageUrl(eb.boss.image) : null,
+            }
+          : null,
+      }));
+    }
 
     res.status(200).json(eventWithStatus);
   } catch (error) {
