@@ -3,7 +3,7 @@ import { User } from "../models/index.js";
 import { Op } from "sequelize";
 
 // Runs every hour
-cron.schedule("* * * * *", async () => {
+cron.schedule("0 * * * *", async () => {
   try {
     const cutoffDate = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
     const inactiveGuests = await User.findAll({
