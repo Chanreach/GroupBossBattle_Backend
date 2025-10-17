@@ -1,6 +1,9 @@
 import express from "express";
 import categoryController from "../controllers/category.controller.js";
-import { authenticateToken, authorizeRoles } from "../middleware/auth.js";
+import {
+  authenticateToken,
+  authorizeRoles,
+} from "../middleware/auth.middleware.js";
 import { getCategoryFilter } from "../middleware/resourceOwnership.js";
 
 const router = express.Router();
@@ -9,7 +12,7 @@ const router = express.Router();
 router.use(authenticateToken);
 
 // Apply role authorization - only hosts and admins can access categories
-router.use(authorizeRoles('host', 'admin'));
+router.use(authorizeRoles("host", "admin"));
 
 // Apply category filtering middleware
 router.use(getCategoryFilter);

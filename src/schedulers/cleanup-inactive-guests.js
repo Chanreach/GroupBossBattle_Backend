@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { User } from "../models/index.js";
+import { User } from "../../models/index.js";
 import { Op } from "sequelize";
 
 // Runs every hour

@@ -7,7 +7,12 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "sync": "node src/sync.js"
+    "sync": "node src/sync.js",
+    "migrate": "npx sequelize-cli db:migrate --config config/config.cjs",
+    "migrate:undo": "npx sequelize-cli db:migrate:undo:all --config config/config.cjs",
+    "seed": "npx sequelize-cli db:seed:all --config config/config.cjs",
+    "seed:undo": "npx sequelize-cli db:seed:undo:all --config config/config.cjs",
+    "migrate:fresh": "npx sequelize-cli db:migrate:undo:all --config config/config.cjs && npx sequelize-cli db:migrate --config config/config.cjs && npx sequelize-cli db:seed:all --config config/config.cjs"
   },
   "keywords": [],
   "author": "",
@@ -30,6 +35,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "sequelize-cli": "^6.6.3",
     "socket.io-client": "^4.8.1"
   }
 }

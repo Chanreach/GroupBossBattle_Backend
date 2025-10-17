@@ -1,6 +1,6 @@
 import express from "express";
 import BadgeController from "../controllers/badge.controller.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticateToken } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 

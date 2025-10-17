@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { EventBoss } from "../models/index.js";
+import { EventBoss } from "../../models/index.js";
 
 // Runs every minute
 cron.schedule("* * * * *", async () => {
@@ -9,12 +9,12 @@ cron.schedule("* * * * *", async () => {
 
     for (const eventBoss of eventBosses) {
       let newStatus = eventBoss.status;
-      if (eventBoss.status === "cooldown" && eventBoss.cooldownEndTime <= now) {
+      if (eventBoss.status === "cooldown" && eventBoss.cooldownEndAt <= now) {
         newStatus = "active";
       }
 
       if (eventBoss.status !== newStatus) {
-        await eventBoss.update({ status: newStatus, cooldownEndTime: null });
+        await eventBoss.update({ status: newStatus, cooldownEndAt: null });
         console.log(
           `[Status Updated] EventBoss: ${eventBoss.id} → ${newStatus}`
         );

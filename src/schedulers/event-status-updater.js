@@ -1,6 +1,19 @@
 import cron from "node-cron";
-import { Event } from "../models/index.js";
-import { updateEventStatus } from "../utils/update-event-status.js";
+import { Event } from "../../models/index.js";
+
+const updateEventStatus = (event) => {
+  const now = new Date();
+  const startAt = new Date(event.startAt);
+  const endAt = new Date(event.endAt);
+
+  if (now < startAt) {
+    return "upcoming";
+  } else if (now >= startAt && now <= endAt) {
+    return "ongoing";
+  } else {
+    return "completed";
+  }
+};
 
 // Runs every minute
 cron.schedule("* * * * *", async () => {

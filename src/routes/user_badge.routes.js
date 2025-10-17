@@ -1,6 +1,9 @@
 import express from "express";
 import userBadgeController from "../controllers/user_badge.controller.js";
-import { authenticateToken, authorizeRoles } from "../middleware/auth.js";
+import {
+  authenticateToken,
+  authorizeRoles,
+} from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 router.use(authenticateToken);

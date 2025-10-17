@@ -1,8 +1,5 @@
 import { Question, Category, Boss, Event } from "../models/index.js";
 
-/**
- * Middleware to check if the user owns the question resource or is an admin
- */
 export function checkQuestionOwnership(req, res, next) {
   return async (req, res, next) => {
     try {
@@ -36,9 +33,6 @@ export function checkQuestionOwnership(req, res, next) {
   };
 }
 
-/**
- * Middleware to check if the user owns the category resource or is an admin
- */
 export function checkCategoryOwnership(req, res, next) {
   return async (req, res, next) => {
     try {
@@ -72,9 +66,6 @@ export function checkCategoryOwnership(req, res, next) {
   };
 }
 
-/**
- * Middleware to check if the user owns the boss resource or is an admin
- */
 export async function checkBossOwnership(req, res, next) {
   try {
     const { id } = req.params;
@@ -106,9 +97,6 @@ export async function checkBossOwnership(req, res, next) {
   }
 }
 
-/**
- * Middleware to check if the user owns the event resource or is an admin
- */
 export async function checkEventOwnership(req, res, next) {
   try {
     const { id } = req.params;
@@ -140,30 +128,18 @@ export async function checkEventOwnership(req, res, next) {
   }
 }
 
-/**
- * Middleware to filter questions based on user role
- * Hosts and admins can see all questions, but hosts can only edit their own
- */
 export function getQuestionFilter(req, res, next) {
   // Both hosts and admins can see all questions
   req.questionFilter = {};
   next();
 }
 
-/**
- * Middleware to filter categories based on user role
- * Hosts and admins can see all categories, but hosts can only edit their own
- */
 export function getCategoryFilter(req, res, next) {
   // Both hosts and admins can see all categories
   req.categoryFilter = {};
   next();
 }
 
-/**
- * Middleware to filter bosses based on user role
- * Hosts can only see their own bosses, admins can see all
- */
 export function getBossFilter(req, res, next) {
   const userRole = req.user.role;
   const userId = req.user.id;
@@ -179,10 +155,6 @@ export function getBossFilter(req, res, next) {
   next();
 }
 
-/**
- * Middleware to filter events based on user role
- * All users can see all events, but only admins can create/edit/delete
- */
 export function getEventFilter(req, res, next) {
   // Both hosts and admins can see all events
   req.eventFilter = {};
