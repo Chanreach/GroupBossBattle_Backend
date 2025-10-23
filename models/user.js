@@ -72,9 +72,11 @@ export default (sequelize, DataTypes) => {
             args: [3, 32],
             msg: "Username length must be between 3 and 32 characters.",
           },
-          isAlphanumeric: {
-            args: true,
-            msg: "Username can only contain letters and numbers.",
+          isAlphanumeric(value) {
+            if (this.isGuest) return;
+            if (value && !validator.isAlphanumeric(value)) {
+              throw new Error("Username can only contain letters and numbers.");
+            }
           },
           isUnique: async function (value) {
             const user = await User.findOne({ where: { username: value } });
