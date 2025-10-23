@@ -5,9 +5,9 @@ export default {
       {
         id: {
           allowNull: false,
-          autoIncrement: true,
+          defaultValue: Sequelize.UUIDV4,
           primaryKey: true,
-          type: Sequelize.INTEGER,
+          type: Sequelize.UUID,
         },
         user_id: {
           allowNull: false,

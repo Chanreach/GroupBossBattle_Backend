@@ -4,7 +4,7 @@ import { calculateBossHP } from "../utils/game.utils.js";
 class EventBossManager {
   async initializeEventBoss(battleSession, eventBossId) {
     if (!battleSession || !eventBossId) {
-      console.error("Battle session or event boss ID is missing");
+      console.error("[EventBossManager] Battle session or event boss ID is missing.");
       return null;
     }
 
@@ -24,7 +24,7 @@ class EventBossManager {
 
   updateEventBossHP(eventBoss, numberOfPlayers) {
     if (!eventBoss || !numberOfPlayers || numberOfPlayers <= 0) {
-      console.error("Event boss or number of players is invalid");
+      console.error("[EventBossManager] Event boss or number of players is invalid.");
       return null;
     }
 
@@ -38,7 +38,7 @@ class EventBossManager {
 
   async updateEventBossStatus(eventBoss, status) {
     if (!eventBoss || !status) {
-      console.error("Event boss or status not found");
+      console.error("[EventBossManager] Event boss or status not found.");
       return null;
     }
 
@@ -53,7 +53,7 @@ class EventBossManager {
 
   isEventBossDefeated(eventBoss) {
     if (!eventBoss) {
-      console.error("Event boss not found");
+      console.error("[EventBossManager] Event boss not found.");
       return null;
     }
     return eventBoss.currentHP <= 0;

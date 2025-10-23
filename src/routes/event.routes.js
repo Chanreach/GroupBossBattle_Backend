@@ -1,11 +1,12 @@
 import express from "express";
-import eventController from "../controllers2/event.controller.js";
+import eventController from "../controllers/event.controller.js";
 import {
   authenticateToken,
   authorizeRoles,
 } from "../middleware/auth.middleware.js";
 import {
-  checkEventOwnership,
+  checkBossesOwnership,
+  checkEventBossesOwnership,
   getEventFilter,
 } from "../middleware/resource.middleware.js";
 
@@ -14,31 +15,25 @@ const router = express.Router();
 router.get("/public", eventController.getAllPublicEvents);
 router.get("/public/:id", eventController.getPublicEventById);
 
-router.use(authenticateToken, authorizeRoles("host", "admin"));
-
+router.use(authenticateToken, authorizeRoles("superadmin", "admin", "host"));
 router.get("/", getEventFilter, eventController.getAllEvents);
 router.get("/:id", eventController.getEventById);
 
-// // Routes only for admins (event creation/editing)
-// router.post("/", authorizeRoles("admin"), eventController.createEvent);
-// router.put(
-//   "/:id",
-//   authorizeRoles("admin"),
-//   checkEventOwnership,
-//   eventController.updateEvent
-// );
-// router.delete(
-//   "/:id",
-//   authorizeRoles("admin"),
-//   checkEventOwnership,
-//   eventController.deleteEvent
-// );
+router.get("/:id/available-bosses", eventController.getAvailableBossesForEvent);
+router.post(
+  "/:id/bosses",
+  checkBossesOwnership,
+  eventController.assignBossesToEvent
+);
+router.delete(
+  "/:id/bosses",
+  checkEventBossesOwnership,
+  eventController.unassignBossFromEvent
+);
 
-// // Boss assignment routes (hosts can assign their own bosses, admins can assign any)
-// router.post("/:id/bosses", eventController.assignBossesToEvent);
-// router.delete("/:id/bosses/:bossId", eventController.unassignBossFromEvent);
-
-// // QR code generation route
-// router.get("/:id/bosses/:bossId/qr", eventController.generateBossQRCode);
+router.use(authorizeRoles("superadmin", "admin"));
+router.post("/", eventController.createEvent);
+router.put("/:id", eventController.updateEvent);
+router.delete("/:id", eventController.deleteEvent);
 
 export default router;

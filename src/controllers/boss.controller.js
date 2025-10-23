@@ -1,332 +1,214 @@
-import { Boss, Category, User } from "../models/index.js";
+import { sequelize, Boss, Category } from "../../models/index.js";
+import { bossIncludes } from "../../models/includes.js";
+import { Op } from "sequelize";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { getImageUrl } from "../utils/image.utils.js";
+import ApiError from "../utils/api-error.util.js";
+import { normalizeName, normalizeText, normalizeInteger } from "../utils/helper.js";
 
-// ES modules equivalent of __dirname
+const DEFAULT_COOLDOWN_DURATION = 60;
+const DEFAULT_NUMBER_OF_TEAMS = 2;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const getAllBosses = async (req, res) => {
-  try {
-    // Get user filter based on role
-    const filter = req.bossFilter || {};
+const getAllBosses = async (req, res, next) => {
+  const filter = req.bossFilter || {};
 
+  try {
     const bosses = await Boss.findAll({
       where: filter,
-      include: [
-        {
-          model: Category,
-          as: "Categories",
-          through: { attributes: [] },
-        },
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username", "email"],
-        },
-      ],
-      order: [["createdAt", "DESC"]],
+      include: bossIncludes({
+        includeCreator: true,
+        includeCategories: true,
+      }),
     });
 
-    const transformedBosses = bosses.map((boss) => {
-      if (boss.image) {
-        boss.image = getImageUrl(boss.image);
-      }
+    const summaries = bosses.map((boss) => boss.getSummary());
 
-      if (boss.creator && boss.creator.profileImage) {
-        boss.creator.profileImage = getImageUrl(boss.creator.profileImage);
-      }
-      return boss;
-    });
-
-    res.status(200).json(transformedBosses);
+    res.status(200).json(summaries);
   } catch (error) {
-    console.error("Error fetching bosses:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 };
 
-const getBossById = async (req, res) => {
+const getBossById = async (req, res, next) => {
   const { id } = req.params;
+
   try {
     const boss = await Boss.findByPk(id, {
-      include: [
-        {
-          model: Category,
-          as: "Categories",
-          through: { attributes: [] },
-        },
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username", "email"],
-        },
-      ],
+      include: bossIncludes({ includeCreator: true, includeCategories: true }),
     });
-
     if (!boss) {
-      return res.status(404).json({ message: "Boss not found" });
+      throw new ApiError(404, "Boss not found.");
     }
 
-    // Check permissions: Host can only view their own bosses, Admin can view all
-    const { role, id: userId } = req.user;
-    if (role === "host" && boss.creatorId !== userId) {
-      return res
-        .status(403)
-        .json({ message: "Access denied. You can only view your own bosses." });
-    }
-
-    if (boss.image) {
-      boss.image = getImageUrl(boss.image);
-    }
-    res.status(200).json(boss);
+    res.status(200).json(boss.getSummary());
   } catch (error) {
-    console.error("Error fetching boss:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 };
 
-const createBoss = async (req, res) => {
+const createBoss = async (req, res, next) => {
   const { name, description, cooldownDuration, numberOfTeams, categoryIds } =
     req.body;
+  const requesterId = req.user.id;
 
+  const transaction = await sequelize.transaction();
   try {
-    console.log("Creating boss with data:", {
-      name,
-      description,
-      cooldownDuration,
-      numberOfTeams,
-      categoryIds,
+    const newBoss = await Boss.create(
+      {
+        name: normalizeName(name),
+        image: req.file ? `bosses/${req.file.filename}` : null,
+        description: normalizeText(description),
+        cooldownDuration: normalizeInteger(cooldownDuration) || DEFAULT_COOLDOWN_DURATION,
+        numberOfTeams: normalizeInteger(numberOfTeams) || DEFAULT_NUMBER_OF_TEAMS,
+        creatorId: requesterId,
+      },
+      { transaction }
+    );
+
+    if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
+      throw new ApiError(400, "Invalid category IDs.");
+    }
+
+    const uniqueCategoryIds = [...new Set(categoryIds)];
+    const categories = await Category.findAll(
+      {
+        where: { id: { [Op.in]: uniqueCategoryIds } },
+      },
+      { transaction }
+    );
+    if (categories.length !== uniqueCategoryIds.length)
+      throw new ApiError(400, "One or more categories not found.");
+
+    await newBoss.setCategories(uniqueCategoryIds, { transaction });
+
+    await transaction.commit();
+
+    res.status(201).json({
+      message: "Boss created successfully!",
+      boss: newBoss.getSummary(),
     });
-
-    // Parse categoryIds if it's a JSON string (from FormData)
-    let parsedCategoryIds = [];
-    if (categoryIds) {
-      try {
-        parsedCategoryIds =
-          typeof categoryIds === "string"
-            ? JSON.parse(categoryIds)
-            : categoryIds;
-      } catch (parseError) {
-        console.error("Error parsing categoryIds:", parseError);
-        return res.status(400).json({ message: "Invalid categoryIds format" });
-      }
-    }
-
-    // Handle image upload
-    let imagePath = null;
-    if (req.file) {
-      imagePath = `bosses/${req.file.filename}`;
-    }
-
-    const newBoss = await Boss.create({
-      name,
-      image: imagePath,
-      description,
-      cooldownDuration: cooldownDuration || 60,
-      numberOfTeams: numberOfTeams || 2,
-      creatorId: req.user.id,
-    });
-
-    // If categoryIds are provided, associate them with the new boss
-    if (Array.isArray(parsedCategoryIds) && parsedCategoryIds.length > 0) {
-      console.log("Associating categories:", parsedCategoryIds);
-
-      const categories = await Category.findAll({
-        where: {
-          id: parsedCategoryIds,
-        },
-      });
-
-      if (categories.length !== parsedCategoryIds.length) {
-        return res.status(400).json({ message: "Some categories not found" });
-      }
-
-      await newBoss.setCategories(categories);
-    }
-
-    const bossWithCategories = await Boss.findByPk(newBoss.id, {
-      include: [
-        {
-          model: Category,
-          as: "Categories",
-          through: { attributes: [] },
-        },
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username", "email"],
-        },
-      ],
-    });
-
-    if (bossWithCategories.image) {
-      bossWithCategories.image = getImageUrl(bossWithCategories.image);
-    }
-    if (bossWithCategories.creator && bossWithCategories.creator.profileImage) {
-      bossWithCategories.creator.profileImage = getImageUrl(
-        bossWithCategories.creator.profileImage
-      );
-    }
-    res.status(201).json(bossWithCategories);
   } catch (error) {
-    console.error("Error creating boss:", error);
-    res.status(500).json({ message: "Internal server error" });
+    await transaction.rollback();
+    next(error);
   }
 };
 
-const updateBoss = async (req, res) => {
+const updateBoss = async (req, res, next) => {
   const { id } = req.params;
   const { name, description, cooldownDuration, numberOfTeams, categoryIds } =
     req.body;
 
+  const transaction = await sequelize.transaction();
   try {
-    // Parse categoryIds if it's a JSON string (from FormData)
-    let parsedCategoryIds = categoryIds;
-    if (categoryIds && typeof categoryIds === "string") {
-      try {
-        parsedCategoryIds = JSON.parse(categoryIds);
-      } catch (parseError) {
-        console.error("Error parsing categoryIds:", parseError);
-        return res.status(400).json({ message: "Invalid categoryIds format" });
-      }
-    }
-
-    const boss = await Boss.findByPk(id);
+    const boss = await Boss.findByPk(id, {
+      include: bossIncludes({ includeCategories: true }),
+      transaction,
+    });
     if (!boss) {
-      return res.status(404).json({ message: "Boss not found" });
+      throw new ApiError(404, "Boss not found.");
     }
 
-    // Check permissions: Host can only update their own bosses, Admin can update all
-    const { role, id: userId } = req.user;
-    if (role === "host" && boss.creatorId !== userId) {
-      return res
-        .status(403)
-        .json({ message: "Access denied. You can only edit your own bosses." });
-    }
-
-    // Handle image upload
+    const updatedFields = {};
+    if (name) updatedFields.name = normalizeName(name);
+    if (description) updatedFields.description = normalizeText(description);
+    if (cooldownDuration) updatedFields.cooldownDuration = cooldownDuration;
+    if (numberOfTeams) updatedFields.numberOfTeams = numberOfTeams;
     if (req.file) {
-      // Delete old image if it exists
       if (boss.image) {
         const oldImagePath = path.join(
           __dirname,
-          "../../uploads/bosses",
-          boss.image
+          "../../uploads/",
+          path.basename(boss.image)
         );
-        try {
-          if (fs.existsSync(oldImagePath)) {
-            fs.unlinkSync(oldImagePath);
-            console.log(`Old boss image deleted: ${oldImagePath}`);
-          }
-        } catch (deleteError) {
-          console.error(
-            `Error deleting old boss image: ${deleteError.message}`
-          );
-          // Continue with update even if old image deletion fails
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath).catch((err) => {
+            console.error("Deleting old boss image error:", err);
+          });
         }
       }
-      boss.image = `bosses/${req.file.filename}`;
+      updatedFields.image = `bosses/${req.file.filename}`;
     }
 
-    // Update boss fields
-    boss.name = name || boss.name;
-    boss.description = description || boss.description;
-    boss.cooldownDuration = cooldownDuration || boss.cooldownDuration;
-    boss.numberOfTeams = numberOfTeams || boss.numberOfTeams;
-
-    await boss.save();
-
-    // Update categories if provided
-    if (Array.isArray(parsedCategoryIds)) {
-      if (parsedCategoryIds.length > 0) {
-        const categories = await Category.findAll({
-          where: { id: parsedCategoryIds },
-        });
-
-        if (categories.length !== parsedCategoryIds.length) {
-          return res.status(400).json({ message: "Some categories not found" });
-        }
-
-        await boss.setCategories(categories);
-      } else {
-        // Clear all categories if empty array is provided
-        await boss.setCategories([]);
-      }
+    if (Object.keys(updatedFields).length > 0) {
+      await boss.update(updatedFields, { transaction });
     }
 
-    // Fetch updated boss with associations
-    const updatedBoss = await Boss.findByPk(id, {
-      include: [
-        {
-          model: Category,
-          as: "Categories",
-          through: { attributes: [] },
-        },
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username", "email"],
-        },
-      ],
-    });
-
-    if (updatedBoss.image) {
-      updatedBoss.image = getImageUrl(updatedBoss.image);
-    }
-    if (updatedBoss.creator && updatedBoss.creator.profileImage) {
-      updatedBoss.creator.profileImage = getImageUrl(
-        updatedBoss.creator.profileImage
-      );
-    }
-    res.status(200).json(updatedBoss);
-  } catch (error) {
-    console.error("Error updating boss:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-const deleteBoss = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const boss = await Boss.findByPk(id);
-    if (!boss) {
-      return res.status(404).json({ message: "Boss not found" });
+    if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
+      throw new ApiError(400, "Invalid category IDs.");
     }
 
-    // Check permissions: Host can only delete their own bosses, Admin can delete all
-    const { role, id: userId } = req.user;
-    if (role === "host" && boss.creatorId !== userId) {
-      return res.status(403).json({
-        message: "Access denied. You can only delete your own bosses.",
+    const uniqueCategoryIds = [...new Set(categoryIds)];
+    const categories = await Category.findAll(
+      {
+        where: { id: { [Op.in]: uniqueCategoryIds } },
+      },
+      { transaction }
+    );
+
+    if (categories.length !== uniqueCategoryIds.length)
+      throw new ApiError(400, "One or more categories not found.");
+
+    const currentCategories = boss.categories;
+    const currentCategoryIds = currentCategories.map((cat) => cat.id);
+    const isSameCategories =
+      currentCategoryIds.length === uniqueCategoryIds.length &&
+      currentCategoryIds.every((id) => uniqueCategoryIds.includes(id));
+
+    if (!isSameCategories) {
+      await boss.setCategories(uniqueCategoryIds, { transaction });
+    }
+
+    if (Object.keys(updatedFields).length === 0 && isSameCategories) {
+      await transaction.rollback();
+      return res.status(200).json({
+        message: "No changes detected. Boss remains unchanged.",
+        boss: boss.getSummary(),
       });
     }
 
-    // Delete associated image file if it exists
+    await transaction.commit();
+
+    res.status(200).json({
+      message: "Boss updated successfully!",
+      boss: boss.getSummary(),
+    });
+  } catch (error) {
+    await transaction.rollback();
+    next(error);
+  }
+};
+
+const deleteBoss = async (req, res, next) => {
+  const { id } = req.params;
+
+  try {
+    const boss = await Boss.findByPk(id);
+    if (!boss) {
+      throw new ApiError(404, "Boss not found.");
+    }
+
     if (boss.image) {
       const imagePath = path.join(
         __dirname,
-        "../../uploads/bosses",
-        boss.image
+        "../../uploads/",
+        path.basename(boss.image)
       );
-      try {
-        if (fs.existsSync(imagePath)) {
-          fs.unlinkSync(imagePath);
-          console.log(`Boss image deleted: ${imagePath}`);
-        }
-      } catch (deleteError) {
-        console.error(`Error deleting boss image: ${deleteError.message}`);
-        // Continue with boss deletion even if image deletion fails
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath).catch((err) => {
+          console.error("Deleting boss image error:", err);
+        });
       }
     }
 
     await boss.destroy();
+
     res.status(204).send();
   } catch (error) {
-    console.error("Error deleting boss:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 };
 

@@ -1,186 +1,110 @@
-import { Category, User } from "../models/index.js";
-import { Op } from "sequelize";
+import { Category } from "../../models/index.js";
+import { categoryIncludes } from "../../models/includes.js";
+import ApiError from "../utils/api-error.util.js";
+import { normalizeName } from "../utils/helper.js";
 
-const getAllCategories = async (req, res) => {
+const getAllCategories = async (req, res, next) => {
+  const filter = req.categoryFilter || {};
+
   try {
-    const filter = req.categoryFilter || {};
-    // const { page = 1, limit = 10 } = req.query;
-
-    // const offset = (page - 1) * limit;
-
-    const categories = await Category.findAndCountAll({
+    const categories = await Category.findAll({
       where: filter,
-      include: [
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username"],
-        },
-      ],
-      order: [["createdAt", "DESC"]],
-      // limit: parseInt(limit),
-      // offset,
+      include: categoryIncludes({
+        includeCreator: true,
+        includeQuestions: true,
+      }),
     });
+
+    const summaries = categories.map((category) => category.getDetails());
+
+    res.status(200).json(summaries);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getCategoryById = async (req, res, next) => {
+  const { id } = req.params;
+
+  try {
+    const category = await Category.findOne({
+      where: { id },
+      include: categoryIncludes({ includeCreator: true }),
+    });
+    if (!category) {
+      throw new ApiError(404, "Category not found.");
+    }
+
+    res.status(200).json(category.getDetails());
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createCategory = async (req, res, next) => {
+  const { name } = req.body;
+  const user = req.user;
+
+  try {
+    const newCategory = await Category.create({
+      name: normalizeName(name),
+      creatorId: user.id,
+    });
+
+    res.status(201).json({
+      message: "Category created successfully!",
+      category: newCategory.getDetails(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateCategory = async (req, res, next) => {
+  const { id } = req.params;
+  const { name } = req.body;
+
+  try {
+    const category = await Category.findByPk(id);
+    if (!category) {
+      throw new ApiError(404, "Category not found.");
+    }
+
+    const updatedFields = {};
+    if (name) updatedFields.name = normalizeName(name);
+
+    if (Object.keys(updatedFields).length === 0) {
+      return res.status(200).json({
+        message: "No changes detected. Category remains unchanged.",
+        category: category.getDetails(),
+      });
+    }
+
+    await category.update(updatedFields);
 
     res.status(200).json({
-      categories: categories.rows,
-      totalCount: categories.count,
-      // currentPage: parseInt(page),
-      // totalPages: Math.ceil(categories.count / limit),
+      message: "Category updated successfully!",
+      category: category.getDetails(),
     });
   } catch (error) {
-    console.error("Error fetching categories:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 };
 
-const getCategoryById = async (req, res) => {
+const deleteCategory = async (req, res, next) => {
+  const { id } = req.params;
+
   try {
-    const { id } = req.params;
-    const filter = req.categoryFilter || {};
-    filter.id = id;
-
-    const category = await Category.findOne({
-      where: filter,
-      include: [
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username"],
-        },
-      ],
-    });
-
+    const category = await Category.findByPk(id);
     if (!category) {
-      return res.status(404).json({ message: "Category not found" });
-    }
-
-    res.status(200).json(category);
-  } catch (error) {
-    console.error("Error fetching category:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-const createCategory = async (req, res) => {
-  try {
-    const { name } = req.body;
-    const creatorId = req.user.id;
-
-    // Validate required fields
-    if (!name || name.trim() === "") {
-      return res.status(400).json({ message: "Category name is required" });
-    }
-
-    // Check for duplicate category name for this user
-    const existingCategory = await Category.findOne({
-      where: {
-        name: name.trim(),
-        creatorId,
-      },
-    });
-
-    if (existingCategory) {
-      return res.status(409).json({ message: "Category with this name already exists" });
-    }
-
-    const newCategory = await Category.create({
-      name: name.trim(),
-      creatorId,
-    });
-
-    // Fetch the category with creator info
-    const categoryWithCreator = await Category.findByPk(newCategory.id, {
-      include: [
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username"],
-        },
-      ],
-    });
-
-    res.status(201).json(categoryWithCreator);
-  } catch (error) {
-    console.error("Error creating category:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-const updateCategory = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name } = req.body;
-    const creatorId = req.user.id;
-
-    // Find category with ownership check
-    const categoryFilter = req.user.role === 'admin' ? { id } : { id, creatorId };
-    const category = await Category.findOne({ where: categoryFilter });
-
-    if (!category) {
-      return res.status(404).json({ message: "Category not found or access denied" });
-    }
-
-    // Validate name if provided
-    if (name !== undefined) {
-      if (!name || name.trim() === "") {
-        return res.status(400).json({ message: "Category name cannot be empty" });
-      }
-
-      // Check for duplicate name (excluding current category)
-      const existingCategory = await Category.findOne({
-        where: {
-          name: name.trim(),
-          creatorId: category.creatorId,
-          id: { [Op.ne]: id },
-        },
-      });
-
-      if (existingCategory) {
-        return res.status(409).json({ message: "Category with this name already exists" });
-      }
-
-      category.name = name.trim();
-    }
-
-    await category.save();
-
-    // Fetch updated category with creator info
-    const updatedCategory = await Category.findByPk(id, {
-      include: [
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username"],
-        },
-      ],
-    });
-
-    res.status(200).json(updatedCategory);
-  } catch (error) {
-    console.error("Error updating category:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-const deleteCategory = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const creatorId = req.user.id;
-
-    // Find category with ownership check
-    const categoryFilter = req.user.role === 'admin' ? { id } : { id, creatorId };
-    const category = await Category.findOne({ where: categoryFilter });
-
-    if (!category) {
-      return res.status(404).json({ message: "Category not found or access denied" });
+      throw new ApiError(404, "Category not found.");
     }
 
     await category.destroy();
+
     res.status(204).send();
   } catch (error) {
-    console.error("Error deleting category:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 };
 

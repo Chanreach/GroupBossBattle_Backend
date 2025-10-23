@@ -65,7 +65,7 @@ const fileFilter = (req, file, cb) => {
 const profileUpload = multer({
   storage: profileStorage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 8 * 1024 * 1024, // 8MB limit
   },
   fileFilter: fileFilter
 });
@@ -74,7 +74,7 @@ const profileUpload = multer({
 const bossUpload = multer({
   storage: bossStorage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 8 * 1024 * 1024, // 8MB limit
   },
   fileFilter: fileFilter
 });

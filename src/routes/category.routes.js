@@ -4,23 +4,24 @@ import {
   authenticateToken,
   authorizeRoles,
 } from "../middleware/auth.middleware.js";
-import { getCategoryFilter } from "../middleware/resourceOwnership.js";
+import {
+  checkCategoryOwnership,
+  getCategoryFilter,
+} from "../middleware/resource.middleware.js";
 
 const router = express.Router();
 
-// Apply authentication to all routes
-router.use(authenticateToken);
+router.use(
+  authenticateToken,
+  authorizeRoles("superadmin", "admin", "host"),
+  getCategoryFilter
+);
 
-// Apply role authorization - only hosts and admins can access categories
-router.use(authorizeRoles("host", "admin"));
-
-// Apply category filtering middleware
-router.use(getCategoryFilter);
-
-// Category routes
 router.get("/", categoryController.getAllCategories);
 router.get("/:id", categoryController.getCategoryById);
 router.post("/", categoryController.createCategory);
+
+router.use(checkCategoryOwnership);
 router.put("/:id", categoryController.updateCategory);
 router.delete("/:id", categoryController.deleteCategory);
 

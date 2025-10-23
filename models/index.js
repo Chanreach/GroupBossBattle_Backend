@@ -14,15 +14,20 @@ const config = configFile[env];
 const db = {};
 
 let sequelize;
-if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], config);
-} else {
-  sequelize = new Sequelize(
-    config.database,
-    config.username,
-    config.password,
-    config
-  );
+try {
+  if (config.use_env_variable) {
+    sequelize = new Sequelize(process.env[config.use_env_variable], config);
+  } else {
+    sequelize = new Sequelize(
+      config.database,
+      config.username,
+      config.password,
+      config
+    );
+  }
+} catch (error) {
+  console.error("[Sequelize] Failed to initialize:", error);
+  throw error;
 }
 
 const files = fs
@@ -31,14 +36,21 @@ const files = fs
     (file) =>
       file.indexOf(".") !== 0 &&
       file !== basename &&
+      file !== "includes.js" &&
       file.endsWith(".js") &&
       !file.includes(".test.js")
   );
 
 for (const file of files) {
-  const modelModule = await import(pathToFileURL(path.join(__dirname, file)));
-  const model = modelModule.default(sequelize, Sequelize.DataTypes);
-  db[model.name] = model;
+  try {
+    const modulePath = pathToFileURL(path.join(__dirname, file));
+    const modelModule = await import(modulePath);
+    const model = modelModule.default(sequelize, Sequelize.DataTypes);
+    db[model.name] = model;
+  } catch (error) {
+    console.error(`[Model] Failed to import ${file}:`, error);
+    throw error;
+  }
 }
 
 Object.keys(db).forEach((modelName) => {
@@ -62,5 +74,7 @@ export const {
   UserBadge,
   Leaderboard,
 } = db;
+
+export { sequelize, Sequelize };
 
 export default db;

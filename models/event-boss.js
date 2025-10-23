@@ -26,11 +26,23 @@ export default (sequelize, DataTypes) => {
         numberOfTeams: this.numberOfTeams,
         event: this.event ? this.event.getSummary() : null,
       };
+
       if (this.boss) {
         summary.name = this.boss.name;
         summary.image = this.boss.getImageUrl();
         summary.description = this.boss.description;
+        summary.creatorId = this.boss.creatorId;
+        summary.creator = this.boss.creator
+          ? this.boss.creator.getFullProfile()
+          : null;
+
+        if (this.boss.categories) {
+          summary.categories = this.boss.categories.map((category) =>
+            category.getDetails()
+          );
+        }
       }
+
       return summary;
     }
   }
@@ -39,66 +51,84 @@ export default (sequelize, DataTypes) => {
     {
       id: {
         type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
       eventId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Event ID cannot be empty" },
+          notEmpty: { msg: "Event ID cannot be empty." },
           isUUID: {
             args: 4,
-            msg: "Event ID must be a valid UUID",
+            msg: "Event ID must be a valid UUID.",
           },
         },
       },
       bossId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Boss ID cannot be empty" },
+          notEmpty: { msg: "Boss ID cannot be empty." },
           isUUID: {
             args: 4,
-            msg: "Boss ID must be a valid UUID",
+            msg: "Boss ID must be a valid UUID.",
           },
         },
       },
-      status: DataTypes.STRING,
+      status: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "pending",
+        validate: {
+          isIn: {
+            args: [["pending", "active", "in-battle", "cooldown"]],
+            msg: "Status must be one of: pending, active, in-battle, cooldown.",
+          },
+        },
+      },
       joinCode: {
         type: DataTypes.STRING,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Join code cannot be empty" },
+          notEmpty: { msg: "Join code cannot be empty." },
           len: {
             args: 6,
-            msg: "Join code must be exactly 6 characters",
+            msg: "Join code must be exactly 6 characters.",
           },
           isAlphanumeric: {
-            msg: "Join code must be alphanumeric",
+            msg: "Join code must be alphanumeric.",
           },
-          isUnique: async function (value, next) {
+          isUnique: async function (value) {
             const exists = await EventBoss.findOne({
               where: { eventId: this.eventId, joinCode: value },
             });
             if (exists && exists.id !== this.id) {
-              return next("Join code must be unique");
+              throw new Error("Join code must be unique.");
             }
-            return next();
           },
         },
       },
       cooldownDuration: {
         type: DataTypes.INTEGER,
+        allowNull: false,
         validate: {
+          notEmpty: { msg: "Cooldown duration cannot be empty." },
           min: {
             args: [1],
-            msg: "Cooldown duration must be at least 1 second",
+            msg: "Cooldown duration must be at least 1 second.",
           },
         },
       },
       numberOfTeams: {
         type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 2,
         validate: {
+          notEmpty: { msg: "Number of teams cannot be empty." },
           min: {
             args: [2],
-            msg: "There must be at least 2 teams",
+            msg: "There must be at least 2 teams.",
           },
         },
       },
@@ -109,19 +139,27 @@ export default (sequelize, DataTypes) => {
       tableName: "event_bosses",
       timestamps: true,
       underscored: true,
+      hooks: {
+        beforeCreate: async (eventBoss) => {
+          const event = await sequelize.models.Event.findByPk(
+            eventBoss.eventId
+          );
+          if (event?.status === "ongoing") eventBoss.status = "active";
+        },
+        beforeUpdate: async (eventBoss) => {
+          const event = await sequelize.models.Event.findByPk(
+            eventBoss.eventId
+          );
+          if (event?.status === "ongoing") eventBoss.status = "active";
+        },
+      },
       scopes: {
-        withEvent: {
-          include: [{ model: sequelize.models.Event, as: "event" }],
-        },
-        withBoss: {
-          include: [{ model: sequelize.models.Boss, as: "boss" }],
-        },
-        withEventAndBoss: {
-          include: [
-            { model: sequelize.models.Event, as: "event" },
-            { model: sequelize.models.Boss, as: "boss" },
-          ],
-        },
+        byEvent: (eventId) => ({
+          where: { eventId },
+        }),
+        byBoss: (bossId) => ({
+          where: { bossId },
+        }),
       },
     }
   );

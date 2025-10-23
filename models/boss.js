@@ -25,7 +25,7 @@ export default (sequelize, DataTypes) => {
     }
 
     getSummary() {
-      return {
+      const summary = {
         id: this.id,
         name: this.name,
         image: this.getImageUrl(),
@@ -35,6 +35,14 @@ export default (sequelize, DataTypes) => {
         creatorId: this.creatorId,
         creator: this.creator ? this.creator.getFullProfile() : null,
       };
+
+      if (this.categories) {
+        summary.categories = this.categories.map((category) =>
+          category.getDetails()
+        );
+      }
+
+      return summary;
     }
   }
 
@@ -42,36 +50,44 @@ export default (sequelize, DataTypes) => {
     {
       id: {
         type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
       name: {
         type: DataTypes.STRING,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Name cannot be empty" },
+          notEmpty: { msg: "Name cannot be empty." },
           len: {
             args: [3, 100],
-            msg: "Name length must be between 3 and 100 characters",
+            msg: "Name length must be between 3 and 100 characters.",
           },
         },
       },
       image: {
         type: DataTypes.STRING,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Image cannot be empty" },
+          notEmpty: { msg: "Image cannot be empty." },
         },
       },
-      description: DataTypes.TEXT,
+      description: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
       cooldownDuration: {
         type: DataTypes.INTEGER,
+        defaultValue: 60,
         validate: {
           min: {
             args: [1],
-            msg: "Cooldown duration must be at least 1 second",
+            msg: "Cooldown duration must be at least 1 second.",
           },
         },
       },
       numberOfTeams: {
         type: DataTypes.INTEGER,
+        defaultValue: 2,
         validate: {
           min: {
             args: [2],
@@ -81,6 +97,7 @@ export default (sequelize, DataTypes) => {
       },
       creatorId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
           notEmpty: { msg: "Creator ID cannot be empty" },
           isUUID: {
@@ -96,10 +113,11 @@ export default (sequelize, DataTypes) => {
       tableName: "bosses",
       timestamps: true,
       underscored: true,
+      defaultScope: {
+        order: [["createdAt", "DESC"]],
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+      },
       scopes: {
-        withCreator: {
-          include: [{ model: sequelize.models.User, as: "creator" }],
-        },
         byCreator: (creatorId) => ({
           where: { creatorId },
         }),

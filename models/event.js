@@ -19,7 +19,7 @@ export default (sequelize, DataTypes) => {
     }
 
     getSummary() {
-      return {
+      const summary = {
         id: this.id,
         name: this.name,
         description: this.description,
@@ -29,6 +29,13 @@ export default (sequelize, DataTypes) => {
         creatorId: this.creatorId,
         creator: this.creator ? this.creator.getFullProfile() : null,
       };
+
+      if (this.eventBosses) {
+        summary.eventBosses = this.eventBosses.map((eb) => eb.getSummary());
+        summary.eventBossCount = this.eventBosses.length;
+      }
+
+      return summary;
     }
   }
 
@@ -44,17 +51,16 @@ export default (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
         validate: {
-          notEmpty: { msg: "Name cannot be empty" },
+          notEmpty: { msg: "Name cannot be empty." },
           len: {
-            args: [3, 100],
-            msg: "Name length must be between 3 and 100 characters",
+            args: [1, 100],
+            msg: "Name length must be between 1 and 100 characters.",
           },
-          isUnique: async function (value, next) {
-            const exists = await Event.findOne({ where: { name: value } });
-            if (exists && exists.id !== this.id) {
-              return next("Event name must be unique");
+          isUnique: async function (value) {
+            const event = await Event.findOne({ where: { name: value } });
+            if (event && event.id !== this.id) {
+              throw new Error("Event name must be unique.");
             }
-            return next();
           },
         },
       },
@@ -66,10 +72,10 @@ export default (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: false,
         validate: {
-          isDate: { msg: "Start time must be a valid date" },
+          isDate: { msg: "Start time must be a valid date." },
           isInFuture(value) {
             if (new Date(value) <= new Date()) {
-              throw new Error("Start time must be in the future");
+              throw new Error("Start time must be in the future.");
             }
           },
         },
@@ -78,22 +84,21 @@ export default (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: false,
         validate: {
-          isDate: { msg: "End time must be a valid date" },
+          isDate: { msg: "End time must be a valid date." },
           isAfterStartTime(value) {
             if (this.startAt && new Date(value) <= new Date(this.startAt)) {
-              throw new Error("End time must be after start time");
+              throw new Error("End time must be after start time.");
             }
           },
         },
       },
       status: {
         type: DataTypes.ENUM("upcoming", "ongoing", "completed"),
-        allowNull: false,
         defaultValue: "upcoming",
         validate: {
           isIn: {
             args: [["upcoming", "ongoing", "completed"]],
-            msg: "Status must be one of: upcoming, ongoing, completed",
+            msg: "Status must be one of: upcoming, ongoing, completed.",
           },
         },
       },
@@ -101,10 +106,10 @@ export default (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: false,
         validate: {
-          notEmpty: { msg: "Creator ID cannot be empty" },
+          notEmpty: { msg: "Creator ID cannot be empty." },
           isUUID: {
             args: 4,
-            msg: "Creator ID must be a valid UUID",
+            msg: "Creator ID must be a valid UUID.",
           },
         },
       },
@@ -135,6 +140,7 @@ export default (sequelize, DataTypes) => {
         },
       },
       defaultScope: {
+        attributes: { exclude: ["createdAt", "updatedAt"] },
         order: [["startAt", "ASC"]],
       },
       scopes: {

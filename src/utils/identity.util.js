@@ -97,9 +97,9 @@ const ADJECTIVES = [
 export const generateGuestName = () => {
   const randomGenerator = new RandomGenerator();
   const randomId = randomGenerator
-    .getRandomInt(0, 9999)
+    .getRandomInt(0, 999999)
     .toString()
-    .padStart(4, "0");
+    .padStart(6, "0");
   return `guest_${randomId}`;
 };
 

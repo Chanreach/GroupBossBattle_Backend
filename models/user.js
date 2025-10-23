@@ -1,4 +1,7 @@
 import { Model } from "sequelize";
+import { Op } from "sequelize";
+import validator from "validator";
+import bcrypt from "bcrypt";
 
 export default (sequelize, DataTypes) => {
   class User extends Model {
@@ -64,17 +67,27 @@ export default (sequelize, DataTypes) => {
         allowNull: false,
         unique: true,
         validate: {
-          notEmpty: { msg: "Username cannot be empty" },
+          notEmpty: { msg: "Username cannot be empty." },
           len: {
-            args: [3, 50],
-            msg: "Username length must be between 3 and 50 characters",
+            args: [3, 32],
+            msg: "Username length must be between 3 and 32 characters.",
           },
-          isUnique: async function (value, next) {
+          isAlphanumeric: {
+            args: true,
+            msg: "Username can only contain letters and numbers.",
+          },
+          isUnique: async function (value) {
             const user = await User.findOne({ where: { username: value } });
             if (user && user.id !== this.id) {
-              return next("Username already in use!");
+              throw new Error("Username already in use.");
             }
-            next();
+          },
+          notGuestPrefix(value) {
+            if (!this.isGuest && /^guest_/i.test(value)) {
+              throw new Error(
+                'Username cannot start with "guest_" as it is reserved for guest users.'
+              );
+            }
           },
         },
       },
@@ -90,23 +103,21 @@ export default (sequelize, DataTypes) => {
           notEmpty(value) {
             if (this.isGuest) return;
             if (!value || value.trim() === "") {
-              throw new Error("Email cannot be empty");
+              throw new Error("Email cannot be empty.");
             }
           },
           isEmail(value) {
             if (this.isGuest) return;
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(value)) {
-              throw new Error("Must be a valid email address");
+            if (value && !validator.isEmail(value)) {
+              throw new Error("Email must be a valid email address.");
             }
           },
-          isUnique: async function (value, next) {
-            if (this.isGuest) return next();
+          isUnique: async function (value) {
+            if (this.isGuest) return;
             const user = await User.findOne({ where: { email: value } });
             if (user && user.id !== this.id) {
-              return next("Email address already in use!");
+              throw new Error("Email address already in use.");
             }
-            next();
           },
         },
       },
@@ -122,16 +133,17 @@ export default (sequelize, DataTypes) => {
           },
           len(value) {
             if (this.isGuest) return;
-            if (value.length < 8 || value.length > 100) {
+            if (value.length < 12 || value.length > 64) {
               throw new Error(
-                "Password length must be between 8 and 100 characters"
+                "Password length must be between 12 and 64 characters"
               );
             }
           },
           isStrongPassword(value) {
             if (this.isGuest) return;
+            if (value.length < 12 || value.length > 64) return;
             const passwordRegex =
-              /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,100}$/;
+              /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,64}$/;
             if (!passwordRegex.test(value)) {
               throw new Error(
                 "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character."
@@ -143,6 +155,12 @@ export default (sequelize, DataTypes) => {
       role: {
         type: DataTypes.ENUM("player", "host", "admin", "superadmin"),
         defaultValue: "player",
+        validate: {
+          isIn: {
+            args: [["player", "host", "admin", "superadmin"]],
+            msg: "Role must be one of: player, host, admin, superadmin.",
+          },
+        },
       },
       isGuest: {
         type: DataTypes.BOOLEAN,
@@ -160,12 +178,25 @@ export default (sequelize, DataTypes) => {
       timestamps: true,
       underscored: true,
       hooks: {
-        beforeCreate: (user) => {
+        beforeCreate: async (user) => {
           user.lastActiveAt = new Date();
+          if (user.password && !user.isGuest) {
+            const saltRounds = 10;
+            const hashedPassword = await bcrypt.hash(user.password, saltRounds);
+            user.password = hashedPassword;
+          }
         },
-        beforeUpdate: (user) => {
+        beforeUpdate: async (user) => {
           user.lastActiveAt = new Date();
+          if (user.changed("password") && !user.isGuest) {
+            const saltRounds = 10;
+            const hashedPassword = await bcrypt.hash(user.password, saltRounds);
+            user.password = hashedPassword;
+          }
         },
+      },
+      defaultScope: {
+        attributes: { exclude: ["password", "createdAt", "updatedAt"] },
       },
       scopes: {
         player: {
@@ -177,9 +208,24 @@ export default (sequelize, DataTypes) => {
         admin: {
           where: { role: "admin" },
         },
+        superadmin: {
+          where: { role: "superadmin" },
+        },
         guest: {
           where: { isGuest: true },
         },
+        emailOrUsername: (value) => ({
+          where: {
+            [Op.or]: [{ email: value }, { username: value }],
+          },
+        }),
+        byRoles: (roles) => ({
+          where: {
+            role: {
+              [Op.in]: roles,
+            },
+          },
+        }),
       },
     }
   );

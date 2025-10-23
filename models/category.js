@@ -26,13 +26,16 @@ export default (sequelize, DataTypes) => {
         creatorId: this.creatorId,
         creator: this.creator ? this.creator.getFullProfile() : null,
       };
+
       if (this.bosses) {
         details.bosses = this.bosses.map((boss) => boss.getSummary());
       }
+
       if (this.questions) {
         details.questions = this.questions.map((question) =>
           question.getDetails()
         );
+        details.questionCount = this.questions.length;
       }
       return details;
     }
@@ -42,32 +45,34 @@ export default (sequelize, DataTypes) => {
     {
       id: {
         type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
       name: {
         type: DataTypes.STRING,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Name cannot be empty" },
+          notEmpty: { msg: "Name cannot be empty." },
           len: {
-            args: [2, 50],
-            msg: "Name length must be between 2 and 50 characters",
+            args: [2, 32],
+            msg: "Name length must be between 2 and 32 characters.",
           },
-          isUnique: async function (value, next) {
+          isUnique: async function (value) {
             const exists = await Category.findOne({ where: { name: value } });
             if (exists && exists.id !== this.id) {
-              return next("Category name must be unique");
+              throw new Error("Category name must be unique.");
             }
-            return next();
           },
         },
       },
       creatorId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Creator ID cannot be empty" },
+          notEmpty: { msg: "Creator ID cannot be empty." },
           isUUID: {
             args: 4,
-            msg: "Creator ID must be a valid UUID",
+            msg: "Creator ID must be a valid UUID.",
           },
         },
       },
@@ -78,27 +83,11 @@ export default (sequelize, DataTypes) => {
       tableName: "categories",
       timestamps: true,
       underscored: true,
+      defaultScope: {
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+        order: [["name", "ASC"]],
+      },
       scopes: {
-        withBosses: {
-          include: [{ model: sequelize.models.Boss, as: "bosses" }],
-        },
-        withQuestions: {
-          include: [{ model: sequelize.models.Question, as: "questions" }],
-        },
-        withQuestionsAndChoices: {
-          include: [
-            {
-              model: sequelize.models.Question,
-              as: "questions",
-              include: [
-                {
-                  model: sequelize.models.AnswerChoice,
-                  as: "answerChoices",
-                },
-              ],
-            },
-          ],
-        },
         byCreator: (creatorId) => ({
           where: { creatorId },
         }),

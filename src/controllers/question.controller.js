@@ -1,430 +1,221 @@
-import { Question, AnswerChoice, Category, User } from "../models/index.js";
-import { Op } from "sequelize";
-import sequelize from "../config/db.js";
+import {
+  sequelize,
+  Question,
+  AnswerChoice,
+  Category,
+  User,
+} from "../../models/index.js";
+import { questionIncludes } from "../../models/includes.js";
+import ApiError from "../utils/api-error.util.js";
+import { normalizeText, normalizeInteger } from "../utils/helper.js";
 
-/**
- * Validation helper functions
- */
-const validateQuestionData = (questionText, answerChoices, timeLimit) => {
-  const errors = [];
-
-  // Validate question text
-  if (!questionText || questionText.trim() === "") {
-    errors.push("Question text is required");
+const validateAnswerChoices = (answerChoices) => {
+  if (!Array.isArray(answerChoices) || answerChoices.length !== 8) {
+    throw new ApiError(400, "Exactly 8 answer choices are required.");
   }
 
-  // Validate time limit
-  if (!timeLimit || !Number.isInteger(timeLimit) || timeLimit <= 0) {
-    errors.push("Time limit must be a positive integer");
+  const choiceTexts = answerChoices.map((choice) =>
+    normalizeText(choice.choiceText)
+  );
+  const uniqueChoiceTexts = new Set(choiceTexts);
+  if (uniqueChoiceTexts.size !== choiceTexts.length) {
+    throw new ApiError(400, "Answer choice texts must be unique.");
   }
 
-  // Validate answer choices
-  if (!answerChoices || !Array.isArray(answerChoices) || answerChoices.length !== 8) {
-    errors.push("Exactly 8 answer choices are required");
-  } else {
-    // Check for empty choices
-    const emptyChoices = answerChoices.filter(choice => !choice.choiceText || choice.choiceText.trim() === "");
-    if (emptyChoices.length > 0) {
-      errors.push("All answer choices must have non-empty text");
-    }
-
-    // Check for duplicate choices
-    const choiceTexts = answerChoices.map(choice => choice.choiceText?.trim().toLowerCase());
-    const uniqueChoices = new Set(choiceTexts);
-    if (uniqueChoices.size !== choiceTexts.length) {
-      errors.push("Answer choices must be unique");
-    }
-
-    // Check for exactly one correct answer
-    const correctAnswers = answerChoices.filter(choice => choice.isCorrect === true);
-    if (correctAnswers.length !== 1) {
-      errors.push("Exactly one answer choice must be marked as correct");
-    }
-  }
-
-  return errors;
-};
-
-/**
- * Get all questions with filtering based on user role
- */
-const getAllQuestions = async (req, res) => {
-  try {
-    const filter = req.questionFilter || {};
-    const { categoryId } = req.query;
-
-    // Add category filter if provided
-    if (categoryId) {
-      filter.categoryId = categoryId;
-    }
-
-    // const offset = (page - 1) * limit;
-
-    const questions = await Question.findAndCountAll({
-      where: filter,
-      include: [
-        {
-          model: AnswerChoice,
-          as: "answerChoices",
-        },
-        {
-          model: Category,
-          as: "category",
-          attributes: ["id", "name"],
-        },
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username"],
-        },
-      ],
-      order: [["createdAt", "DESC"]],
-      // limit: parseInt(limit),
-      // offset,
-    });
-
-    res.status(200).json({
-      questions: questions.rows,
-      totalCount: questions.count, // This is now correctly filtered by categoryId if provided
-      // currentPage: parseInt(page),
-      // totalPages: Math.ceil(questions.count / limit),
-    });
-  } catch (error) {
-    console.error("Error fetching questions:", error);
-    res.status(500).json({ message: "Internal server error" });
+  const correctChoices = answerChoices.filter((choice) => choice.isCorrect);
+  if (correctChoices.length !== 1) {
+    throw new ApiError(400, "There must be exactly one correct answer choice.");
   }
 };
 
-/**
- * Get question by ID
- */
-const getQuestionById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const filter = req.questionFilter || {};
-    filter.id = id;
-
-    const question = await Question.findOne({
-      where: filter,
-      include: [
-        {
-          model: AnswerChoice,
-          as: "answerChoices",
-        },
-        {
-          model: Category,
-          as: "category",
-          attributes: ["id", "name"],
-        },
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username"],
-        },
-      ],
-    });
-
-    if (!question) {
-      return res.status(404).json({ message: "Question not found" });
-    }
-
-    res.status(200).json(question);
-  } catch (error) {
-    console.error("Error fetching question:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-/**
- * Create a new question
- */
-const createQuestion = async (req, res) => {
-  const transaction = await sequelize.transaction();
+const getAllQuestions = async (req, res, next) => {
+  const filter = req.questionFilter || {};
 
   try {
-    const { categoryId, questionText, answerChoices, timeLimit = 30 } = req.body;
-    const authorId = req.user.id;
-
-    // Validate required fields
-    if (!categoryId) {
-      await transaction.rollback();
-      return res.status(400).json({ message: "Category ID is required" });
-    }
-
-    // Check if category exists (hosts can use any category, not just their own)
-    const category = await Category.findByPk(categoryId);
-    if (!category) {
-      await transaction.rollback();
-      return res.status(404).json({ message: "Category not found" });
-    }
-
-    // Validate question data
-    const validationErrors = validateQuestionData(questionText, answerChoices, timeLimit);
-    if (validationErrors.length > 0) {
-      await transaction.rollback();
-      return res.status(400).json({ 
-        message: "Validation failed", 
-        errors: validationErrors 
-      });
-    }
-
-    // Create question
-    const newQuestion = await Question.create({
-      categoryId,
-      questionText: questionText.trim(),
-      timeLimit,
-      authorId,
-    }, { transaction });
-
-    // Create answer choices
-    const answerChoicePromises = answerChoices.map((choice) => {
-      return AnswerChoice.create({
-        questionId: newQuestion.id,
-        choiceText: choice.choiceText.trim(),
-        isCorrect: choice.isCorrect || false,
-      }, { transaction });
-    });
-
-    await Promise.all(answerChoicePromises);
-
-    await transaction.commit();
-
-    // Fetch the complete question with associations
-    const createdQuestion = await Question.findByPk(newQuestion.id, {
-      include: [
-        {
-          model: AnswerChoice,
-          as: "answerChoices",
-        },
-        {
-          model: Category,
-          as: "category",
-          attributes: ["id", "name"],
-        },
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username"],
-        },
-      ],
-    });
-
-    res.status(201).json(createdQuestion);
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Error creating question:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-/**
- * Update a question
- */
-const updateQuestion = async (req, res) => {
-  const transaction = await sequelize.transaction();
-
-  try {
-    const { id } = req.params;
-    const { categoryId, questionText, answerChoices, timeLimit } = req.body;
-    const authorId = req.user.id;
-
-    // Find question with ownership check
-    const questionFilter = req.user.role === 'admin' ? { id } : { id, authorId };
-    const question = await Question.findOne({ where: questionFilter });
-
-    if (!question) {
-      await transaction.rollback();
-      return res.status(404).json({ message: "Question not found or access denied" });
-    }
-
-    // If categoryId is being updated, check if new category exists
-    if (categoryId && categoryId !== question.categoryId) {
-      const category = await Category.findByPk(categoryId);
-      if (!category) {
-        await transaction.rollback();
-        return res.status(404).json({ message: "Category not found" });
-      }
-    }
-
-    // Validate question data if provided
-    if (answerChoices) {
-      const validationErrors = validateQuestionData(
-        questionText || question.questionText, 
-        answerChoices, 
-        timeLimit || question.timeLimit
-      );
-      if (validationErrors.length > 0) {
-        await transaction.rollback();
-        return res.status(400).json({ 
-          message: "Validation failed", 
-          errors: validationErrors 
-        });
-      }
-    }
-
-    // Update question
-    if (categoryId) question.categoryId = categoryId;
-    if (questionText) question.questionText = questionText.trim();
-    if (timeLimit) question.timeLimit = timeLimit;
-
-    await question.save({ transaction });
-
-    // Update answer choices if provided
-    if (answerChoices) {
-      // Delete existing answer choices
-      await AnswerChoice.destroy({
-        where: { questionId: id },
-        transaction,
-      });
-
-      // Create new answer choices
-      const answerChoicePromises = answerChoices.map((choice) => {
-        return AnswerChoice.create({
-          questionId: id,
-          choiceText: choice.choiceText.trim(),
-          isCorrect: choice.isCorrect || false,
-        }, { transaction });
-      });
-
-      await Promise.all(answerChoicePromises);
-    }
-
-    await transaction.commit();
-
-    // Fetch the updated question with associations
-    const updatedQuestion = await Question.findByPk(id, {
-      include: [
-        {
-          model: AnswerChoice,
-          as: "answerChoices",
-        },
-        {
-          model: Category,
-          as: "category",
-          attributes: ["id", "name"],
-        },
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username"],
-        },
-      ],
-    });
-
-    res.status(200).json(updatedQuestion);
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Error updating question:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-/**
- * Delete a question
- */
-const deleteQuestion = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const authorId = req.user.id;
-
-    // Find question with ownership check
-    const questionFilter = req.user.role === 'admin' ? { id } : { id, authorId };
-    const question = await Question.findOne({ where: questionFilter });
-
-    if (!question) {
-      return res.status(404).json({ message: "Question not found or access denied" });
-    }
-
-    // Delete question (answer choices will be deleted via cascade)
-    await question.destroy();
-
-    res.status(204).send();
-  } catch (error) {
-    console.error("Error deleting question:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-/**
- * Get questions by category
- */
-const getQuestionsByCategory = async (req, res) => {
-  try {
-    const { categoryId } = req.params;
-    const filter = req.questionFilter || {};
-    filter.categoryId = categoryId;
-
     const questions = await Question.findAll({
       where: filter,
-      include: [
-        {
-          model: AnswerChoice,
-          as: "answerChoices",
-        },
-        {
-          model: User,
-          as: "creator",
-          attributes: ["id", "username"],
-        },
-      ],
-      order: [["createdAt", "DESC"]],
+      include: questionIncludes({
+        includeAuthor: true,
+        includeCategory: true,
+      }),
     });
 
     res.status(200).json(questions);
   } catch (error) {
-    console.error("Error fetching questions by category:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 };
 
-/**
- * Get question count by category
- */
-const getQuestionCountByCategory = async (req, res) => {
-  try {
-    const { categoryId } = req.params;
-    const filter = req.questionFilter || {};
-    filter.categoryId = categoryId;
+const getQuestionById = async (req, res, next) => {
+  const { id } = req.params;
 
-    const count = await Question.count({
-      where: filter
+  try {
+    const question = await Question.findOne({
+      where: { id },
+      include: questionIncludes({
+        includeAuthor: true,
+        includeCategory: true,
+        includeAnswerChoices: true,
+      }),
     });
+    if (!question) {
+      throw new ApiError(404, "Question not found.");
+    }
 
-    res.status(200).json({ count });
+    res.status(200).json(question);
   } catch (error) {
-    console.error("Error fetching question count by category:", error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
 };
 
-/**
- * Get question statistics
- */
-const getQuestionStats = async (req, res) => {
-  try {
-    const filter = req.questionFilter || {};
+const createQuestion = async (req, res, next) => {
+  const { categoryId, questionText, timeLimit, answerChoices } = req.body;
+  const user = req.user;
 
-    const stats = await Question.findAll({
-      where: filter,
-      attributes: [
-        [sequelize.fn('COUNT', sequelize.col('Question.id')), 'totalQuestions'],
-        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN Question.created_at >= NOW() - INTERVAL 30 DAY THEN 1 END')), 'recentQuestions'],
-      ],
-      include: [
+  console.log("Creating question with data:", req.body);
+  console.log("Time Limit: ", normalizeInteger(timeLimit) || 20);
+
+  const transaction = await sequelize.transaction();
+  try {
+    const category = await Category.findByPk(categoryId, { transaction });
+    if (!category) {
+      throw new ApiError(404, "Category not found.");
+    }
+
+    const newQuestion = await Question.create(
+      {
+        categoryId,
+        questionText: normalizeText(questionText),
+        timeLimit: normalizeInteger(timeLimit) || 20,
+        authorId: user.id,
+      },
+      { transaction }
+    );
+
+    validateAnswerChoices(answerChoices);
+
+    for (const choice of answerChoices) {
+      await AnswerChoice.create(
         {
-          model: Category,
-          as: "category",
-          attributes: ["name"],
+          questionId: newQuestion.id,
+          choiceText: choice.choiceText,
+          isCorrect: choice.isCorrect,
         },
-      ],
-      group: ["category.id", "category.name"],
-      raw: true,
-    });
+        { transaction }
+      );
+    }
 
-    res.status(200).json(stats);
+    await transaction.commit();
+
+    res.status(201).json({
+      message: "Question created successfully!",
+      question: newQuestion,
+    });
   } catch (error) {
-    console.error("Error fetching question statistics:", error);
-    res.status(500).json({ message: "Internal server error" });
+    await transaction.rollback();
+    next(error);
+  }
+};
+
+const updateQuestion = async (req, res, next) => {
+  const { id } = req.params;
+  const { categoryId, questionText, timeLimit, answerChoices } = req.body;
+
+  const transaction = await sequelize.transaction();
+  try {
+    const question = await Question.findByPk(id, {
+      include: questionIncludes({
+        includeAuthor: true,
+        includeCategory: true,
+        includeAnswerChoices: true,
+      }),
+    });
+    if (!question) {
+      throw new ApiError(404, "Question not found.");
+    }
+
+    const category = await Category.findByPk(categoryId);
+    if (!category) {
+      throw new ApiError(404, "Category not found.");
+    }
+
+    validateAnswerChoices(answerChoices);
+
+    const updatedFields = {};
+    if (categoryId) updatedFields.categoryId = categoryId;
+    if (questionText) updatedFields.questionText = questionText;
+    if (timeLimit) updatedFields.timeLimit = timeLimit;
+
+    if (Object.keys(updatedFields).length > 0) {
+      await question.update(updatedFields, { transaction });
+    }
+
+    const currentAnswerChoices = question.answerChoices;
+    const isSameAnswerChoices =
+      currentAnswerChoices.length === answerChoices.length &&
+      currentAnswerChoices.every((currentChoice) =>
+        answerChoices.some(
+          (newChoice) =>
+            newChoice.choiceText === currentChoice.choiceText &&
+            newChoice.isCorrect === currentChoice.isCorrect
+        )
+      );
+
+    if (!isSameAnswerChoices) {
+      await AnswerChoice.destroy({
+        where: { questionId: question.id },
+        transaction,
+      });
+      for (const choice of answerChoices) {
+        await AnswerChoice.create(
+          {
+            questionId: question.id,
+            choiceText: choice.choiceText,
+            isCorrect: choice.isCorrect,
+          },
+          { transaction }
+        );
+      }
+    }
+
+    if (Object.keys(updatedFields).length === 0 && isSameAnswerChoices) {
+      await transaction.rollback();
+      return res.status(200).json({
+        message: "No changes detected. Question remains unchanged.",
+        question,
+      });
+    }
+
+    await transaction.commit();
+
+    res.status(200).json({
+      message: "Question updated successfully!",
+      question,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    next(error);
+  }
+};
+
+const deleteQuestion = async (req, res, next) => {
+  const { id } = req.params;
+
+  const transaction = await sequelize.transaction();
+  try {
+    const question = await Question.findByPk(id);
+    if (!question) {
+      throw new ApiError(404, "Question not found.");
+    }
+
+    await question.destroy({ transaction });
+
+    await transaction.commit();
+
+    res.status(204).send();
+  } catch (error) {
+    await transaction.rollback();
+    next(error);
   }
 };
 
@@ -434,7 +225,4 @@ export default {
   createQuestion,
   updateQuestion,
   deleteQuestion,
-  getQuestionsByCategory,
-  getQuestionCountByCategory,
-  getQuestionStats,
 };

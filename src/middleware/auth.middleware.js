@@ -22,7 +22,7 @@ export const authenticateToken = (req, res, next) => {
         .status(500)
         .json({ message: "Internal Server Error.", error: error.message });
     }
-    
+
     req.user = user;
     next();
   });
@@ -31,9 +31,9 @@ export const authenticateToken = (req, res, next) => {
 export const authorizeRoles = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
-      return res
-        .status(403)
-        .json({ message: "Forbidden: Insufficient privileges." });
+      return res.status(403).json({
+        message: "Forbidden: You are not allowed to perform this action.",
+      });
     }
     next();
   };

@@ -6,7 +6,7 @@ import {
   Boss,
   Leaderboard,
   User,
-} from "../models/index.js";
+} from "../../models/index.js";
 import { Op } from "sequelize";
 import { getImageUrl } from "../utils/image.utils.js";
 

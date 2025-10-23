@@ -39,44 +39,53 @@ export default (sequelize, DataTypes) => {
     {
       id: {
         type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
       categoryId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Category ID cannot be empty" },
+          notEmpty: { msg: "Category ID cannot be empty." },
           isUUID: {
             args: 4,
-            msg: "Category ID must be a valid UUID",
+            msg: "Category ID must be a valid UUID.",
           },
         },
       },
       questionText: {
         type: DataTypes.STRING,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Question text cannot be empty" },
+          notEmpty: { msg: "Question text cannot be empty." },
           len: {
-            args: [1, 100],
-            msg: "Question text length must be between 1 and 100 characters",
+            args: [1, 200],
+            msg: "Question text length must be between 1 and 200 characters.",
           },
         },
       },
       timeLimit: {
         type: DataTypes.INTEGER,
+        defaultValue: 20,
         validate: {
-          len: {
-            args: [5, 60],
-            msg: "Time limit must be between 5 and 60 seconds",
+          min: {
+            args: [5],
+            msg: "Time limit must be at least 5 seconds.",
+          },
+          max: {
+            args: [120],
+            msg: "Time limit cannot exceed 120 seconds.",
           },
         },
       },
       authorId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Author ID cannot be empty" },
+          notEmpty: { msg: "Author ID cannot be empty." },
           isUUID: {
             args: 4,
-            msg: "Author ID must be a valid UUID",
+            msg: "Author ID must be a valid UUID.",
           },
         },
       },
@@ -87,18 +96,11 @@ export default (sequelize, DataTypes) => {
       tableName: "questions",
       timestamps: true,
       underscored: true,
+      defaultScope: {
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+        order: [["updatedAt", "DESC"]],
+      },
       scopes: {
-        withAuthor: {
-          include: [{ model: sequelize.models.User, as: "author" }],
-        },
-        withCategory: {
-          include: [{ model: sequelize.models.Category, as: "category" }],
-        },
-        withAnswerChoices: {
-          include: [
-            { model: sequelize.models.AnswerChoice, as: "answerChoices" },
-          ],
-        },
         byCategory: (categoryId) => ({
           where: { categoryId },
         }),

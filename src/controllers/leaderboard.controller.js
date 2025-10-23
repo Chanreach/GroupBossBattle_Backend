@@ -1,11 +1,11 @@
-import { Leaderboard, User, Event } from "../models/index.js";
+import { Leaderboard, User, Event } from "../../models/index.js";
 import { Op, fn, col, literal } from "sequelize";
 import { compareScores } from "../utils/game.utils.js";
 import { getImageUrl } from "../utils/image.utils.js";
 
 const rankLeaderboard = (entries) => {
   if (!entries || entries.length === 0) return [];
-  
+
   entries.sort((a, b) => {
     const scoreA = [a.totalDamageDealt, a.accuracy, a.totalBattlesParticipated];
     const scoreB = [b.totalDamageDealt, b.accuracy, b.totalBattlesParticipated];
@@ -48,7 +48,7 @@ const rankLeaderboard = (entries) => {
 const getEventAllTimeLeaderboard = async (eventId) => {
   try {
     const leaderboardEntries = await Leaderboard.findAll({
-      where: { eventId: eventId },
+      where: { eventId },
       attributes: [
         "userId",
         "eventId",
@@ -119,11 +119,13 @@ const getAllEventAllTimeLeaderboards = async (req, res) => {
     const events = await Event.findAll({
       where: { status: { [Op.ne]: "upcoming" } },
     });
+
     const allLeaderboards = {};
     for (const event of events) {
       const leaderboard = await getEventAllTimeLeaderboard(event.id);
       allLeaderboards[event.id] = leaderboard;
     }
+    
     res.status(200).json({
       leaderboards: allLeaderboards,
       events: events.map((event) => ({

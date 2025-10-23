@@ -1,3 +1,4 @@
+import eventManager from "./event.manager.js";
 import EventBossManager from "./event-boss.manager.js";
 import TeamManager from "../managers/team.manager.js";
 import QuestionManager from "../managers/question.manager.js";
@@ -5,6 +6,7 @@ import CombatManager from "../managers/combat.manager.js";
 import KnockoutManager from "../managers/knockout.manager.js";
 import badgeManager from "../managers/badge.manager.js";
 import leaderboardManager from "./leaderboard.manager.js";
+import EventBossService from "../services/event-boss.service.js";
 import { generateBattleSessionId, compareScores } from "../utils/game.utils.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
 
@@ -21,6 +23,22 @@ class BattleSessionManager {
   }
 
   async createBattleSession(eventBossId) {
+    const eventBoss = await EventBossService.getEventBossById(eventBossId);
+    if (!eventBoss) {
+      console.error(
+        "[BattleSessionManager] Cannot create battle session. Event boss not found."
+      );
+      return null;
+    }
+
+    const eventStatus = this.getEventStatus(eventBoss.eventId);
+    if (eventStatus !== GAME_CONSTANTS.EVENT_STATUS.ONGOING) {
+      console.log(
+        "[BattleSessionManager] Cannot create battle session. Event is not ongoing."
+      );
+      return null;
+    }
+
     const existingSession = this.getBattleSession(eventBossId);
     if (existingSession?.state === GAME_CONSTANTS.BATTLE_STATE.ENDED) {
       this.deleteBattleSession(existingSession.id);
@@ -148,6 +166,14 @@ class BattleSessionManager {
   async addPlayerToBattleSession(eventBossId, playerInfo) {
     const battleSession = this.getBattleSession(eventBossId);
     if (!battleSession) return null;
+
+    const eventStatus = this.getEventStatus(battleSession.event.id);
+    if (eventStatus !== GAME_CONSTANTS.EVENT_STATUS.ONGOING) {
+      console.log(
+        "[BattleSessionManager] Cannot add player. Event is not ongoing."
+      );
+      return null;
+    }
 
     const existingPlayer = this.getPlayerFromBattleSession(
       eventBossId,
@@ -444,21 +470,33 @@ class BattleSessionManager {
 
     const eventBoss = this.getEventBoss(eventBossId);
     if (!eventBoss) {
-      console.error("Event boss not found");
+      console.error("[BattleSessionManager] Event boss not found.");
       return null;
     }
 
+    const eventStatus = this.getEventStatus(battleSession.event.id);
+    if (!eventStatus) return null;
+
     if (eventBoss.status !== GAME_CONSTANTS.BOSS_STATUS.COOLDOWN) {
+      const status =
+        eventStatus === GAME_CONSTANTS.EVENT_STATUS.COMPLETED
+          ? GAME_CONSTANTS.BOSS_STATUS.PENDING
+          : GAME_CONSTANTS.BOSS_STATUS.COOLDOWN;
+
       const updatedEventBoss = await this.updateEventBossStatus(
         eventBossId,
-        GAME_CONSTANTS.BOSS_STATUS.COOLDOWN
+        status
       );
       if (!updatedEventBoss) {
-        console.error("Failed to update event boss status to cooldown");
+        console.error(
+          `[BattleSessionManager] Failed to update event boss status to ${status}`
+        );
         return null;
       }
 
-      battleSession.cooldownEndTime = updatedEventBoss.cooldownEndTime;
+      if (status === GAME_CONSTANTS.BOSS_STATUS.COOLDOWN) {
+        battleSession.cooldownEndTime = updatedEventBoss.cooldownEndTime;
+      }
     }
     return battleSession;
   }
@@ -880,6 +918,16 @@ class BattleSessionManager {
     };
   }
 
+  getEventStatus(eventId) {
+    const status = eventManager.getEventStatus(eventId);
+    if (!status) {
+      console.error("[BattleSessionManager] Event not found.");
+      return null;
+    }
+
+    return status;
+  }
+
   isEventBossDefeated(eventBossId) {
     const battleSession = this.getBattleSession(eventBossId);
     if (!battleSession) return null;
@@ -915,6 +963,14 @@ class BattleSessionManager {
       player.isConnected = false;
     }
     return player;
+  }
+
+  endBattleSessions(eventId) {
+    for (const battleSession of this.battleSessions.values()) {
+      if (battleSession.event.id === eventId) {
+        this.handleEventBossDefeat(battleSession.eventBoss.id);
+      }
+    }
   }
 
   getBattleSessionId(eventBossId) {

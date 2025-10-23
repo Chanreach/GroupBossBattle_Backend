@@ -1,5 +1,5 @@
 import express from "express";
-import userController from "../controllers2/user.controller.js";
+import userController from "../controllers/user.controller.js";
 import {
   authenticateToken,
   authorizeRoles,
@@ -12,7 +12,7 @@ router.use(authenticateToken);
 router.get("/profile", userController.getProfile);
 router.put("/profile", uploadProfileImage, userController.updateProfile);
 
-router.use(authorizeRoles("admin", "superadmin"));
+router.use(authorizeRoles("superadmin", "admin"));
 router.get("/", userController.getAllUsers);
 router.get("/:id", userController.getUserById);
 router.put("/:id", userController.updateUser);

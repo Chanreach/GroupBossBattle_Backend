@@ -5,11 +5,10 @@ import eventRoutes from "./event.routes.js";
 import categoryRoutes from "./category.routes.js";
 import questionRoutes from "./question.routes.js";
 import bossRoutes from "./boss.routes.js";
-import eventBossRoutes from "./event_boss.routes.js";
+import eventBossRoutes from "./event-boss.routes.js";
 import badgeRoutes from "./badge.routes.js";
-import userBadgeRoutes from "./user_badge.routes.js";
+import userBadgeRoutes from "./user-badge.routes.js";
 import leaderboardRoutes from "./leaderboard.routes.js";
-import heartBeatRoutes from "./heartbeat.routes.js";
 
 const router = express.Router();
 
@@ -23,6 +22,5 @@ router.use("/event-bosses", eventBossRoutes);
 router.use("/badges", badgeRoutes);
 router.use("/user-badges", userBadgeRoutes);
 router.use("/leaderboards", leaderboardRoutes);
-router.use("/heartbeat", heartBeatRoutes);
 
 export default router;

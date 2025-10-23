@@ -17,34 +17,48 @@ export default (sequelize, DataTypes) => {
       };
     }
   }
-  
+
   AnswerChoice.init(
     {
       id: {
         type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
       questionId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Question ID cannot be empty" },
+          notEmpty: { msg: "Question ID cannot be empty." },
           isUUID: {
             args: 4,
-            msg: "Question ID must be a valid UUID",
+            msg: "Question ID must be a valid UUID.",
           },
         },
       },
       choiceText: {
         type: DataTypes.STRING,
+        allowNull: false,
         validate: {
-          notEmpty: { msg: "Choice text cannot be empty" },
+          notEmpty: { msg: "Choice text cannot be empty." },
           len: {
-            args: [1, 100],
-            msg: "Choice text length must be between 1 and 100 characters",
+            args: [1, 50],
+            msg: "Choice text length must be between 1 and 50 characters.",
           },
         },
       },
-      isCorrect: DataTypes.BOOLEAN,
+      isCorrect: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        validate: {
+          notEmpty: { msg: "isCorrect cannot be empty." },
+          isIn: {
+            args: [[true, false]],
+            msg: "isCorrect must be either true or false.",
+          },
+        },
+      },
     },
     {
       sequelize,

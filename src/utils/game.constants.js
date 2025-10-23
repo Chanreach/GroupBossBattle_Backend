@@ -10,7 +10,7 @@ export const GAME_CONSTANTS = {
   PLAYER_STARTING_HEARTS: 3,
   REVIVAL_TIMEOUT: 60000,
 
-  DEFAULT_QUESTION_TIME_LIMIT: 30000,
+  DEFAULT_QUESTION_TIME_LIMIT: 20000,
   ANSWERS_PER_QUESTION: 4,
   MINIMUM_ANSWER_CHOICES: 4,
   TOTAL_ANSWER_CHOICES: 8,
@@ -28,7 +28,14 @@ export const GAME_CONSTANTS = {
     SLOW: 1.0,
   },
 
+  EVENT_STATUS: {
+    UPCOMING: "upcoming",
+    ONGOING: "ongoing",
+    COMPLETED: "completed",
+  },
+
   BOSS_STATUS: {
+    PENDING: "pending",
     ACTIVE: "active",
     IN_BATTLE: "in-battle",
     DEFEATED: "defeated",

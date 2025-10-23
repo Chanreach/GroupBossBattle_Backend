@@ -7,7 +7,6 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "sync": "node src/sync.js",
     "migrate": "npx sequelize-cli db:migrate --config config/config.cjs",
     "migrate:undo": "npx sequelize-cli db:migrate:undo:all --config config/config.cjs",
     "seed": "npx sequelize-cli db:seed:all --config config/config.cjs",
@@ -32,7 +31,8 @@
     "qrcode": "^1.5.4",
     "sequelize": "^6.37.7",
     "socket.io": "^4.8.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "validator": "^13.15.15"
   },
   "devDependencies": {
     "sequelize-cli": "^6.6.3",
