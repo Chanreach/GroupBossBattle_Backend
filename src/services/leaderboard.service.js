@@ -1,4 +1,4 @@
-import { Leaderboard, User } from "../models/index.js";
+import { Leaderboard, User } from "../../models/index.js";
 import { fn, col, literal } from "sequelize";
 
 class LeaderboardService {

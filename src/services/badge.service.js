@@ -1,5 +1,5 @@
 import { Op } from "sequelize";
-import { Event, Badge, UserBadge } from "../models/index.js";
+import { Event, Badge, UserBadge } from "../../models/index.js";
 
 class BadgeService {
   static async initializeBadges() {

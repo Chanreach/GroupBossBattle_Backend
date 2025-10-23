@@ -4,7 +4,7 @@ import {
   Category,
   Question,
   AnswerChoice,
-} from "../models/index.js";
+} from "../../models/index.js";
 
 class QuestionService {
   static async getQuestionsByEventBossId(eventBossId) {
