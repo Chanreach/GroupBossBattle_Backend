@@ -1,12 +1,11 @@
-import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
-import { GAME_CONSTANTS } from "../../utils/game.constants.js";
 import matchmakingManager from "../../managers/matchmaking.manager.js";
 import battleSessionManager from "../../managers/battle-session.manager.js";
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
+import { GAME_CONSTANTS } from "../../utils/game.constants.js";
 
 const handleMatchmaking = (io, socket) => {
   socket.on(SOCKET_EVENTS.BATTLE_QUEUE.JOIN, async (payload) => {
     const { eventBossId, playerInfo } = payload;
-
     if (!eventBossId || !playerInfo) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId or playerInfo.",
@@ -15,13 +14,15 @@ const handleMatchmaking = (io, socket) => {
     }
 
     try {
-      if (matchmakingManager.isNicknameTaken(eventBossId, playerInfo.nickname)) {
+      if (
+        matchmakingManager.isNicknameTaken(eventBossId, playerInfo.nickname)
+      ) {
         socket.emit(SOCKET_EVENTS.ERROR, {
           message: "Nickname is already taken.",
         });
         return;
       }
-      
+
       const data = await matchmakingManager.addPlayerToQueue(
         eventBossId,
         playerInfo,
@@ -131,7 +132,7 @@ const handleMatchmaking = (io, socket) => {
 
       socket.leave(SOCKET_ROOMS.BATTLE_QUEUE(eventBossId));
       socket.emit(SOCKET_EVENTS.BATTLE_QUEUE.LEFT, {
-        message: SOCKET_MESSAGES.BATTLE_QUEUE.LEFT,
+        message: "Successfully left the battle queue.",
         data,
       });
       socket.broadcast

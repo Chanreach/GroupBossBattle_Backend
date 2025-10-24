@@ -1,5 +1,5 @@
 import { EventBoss, Event, Boss } from "../../models/index.js";
-import { eventIncludes } from "../../models/includes.js";
+import { eventBossIncludes, eventIncludes } from "../../models/includes.js";
 import ApiError from "../utils/api-error.util.js";
 import { generateJoinCode } from "../utils/code.util.js";
 
@@ -25,10 +25,34 @@ const getEventBossById = async (req, res, next) => {
   const { id } = req.params;
   try {
     const eventBoss = await EventBoss.findByPk(id, {
-      include: eventIncludes({
+      include: eventBossIncludes({
         includeEvent: true,
         includeBoss: true,
         includeCreator: true,
+      }),
+    });
+    if (!eventBoss) {
+      throw new ApiError(404, "Event boss not found.");
+    }
+
+    res.status(200).json(eventBoss.getSummary());
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getEventBossByIdAndJoinCode = async (req, res, next) => {
+  const { id, joinCode } = req.params;
+  try {
+    const eventBoss = await EventBoss.findOne({
+      where: { id, joinCode },
+      include: eventBossIncludes({
+        includeEvent: true,
+        includeBoss: true,
+        includeCreator: true,
+        includeCategories: true,
+        includeQuestions: true,
+        includeAnswerChoices: true,
       }),
     });
     if (!eventBoss) {
@@ -147,6 +171,7 @@ const deleteEventBoss = async (req, res, next) => {
 export default {
   getAllEventBosses,
   getEventBossById,
+  getEventBossByIdAndJoinCode,
   createEventBoss,
   updateEventBoss,
   deleteEventBoss,

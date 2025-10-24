@@ -3,7 +3,6 @@ import {
   Question,
   AnswerChoice,
   Category,
-  User,
 } from "../../models/index.js";
 import { questionIncludes } from "../../models/includes.js";
 import ApiError from "../utils/api-error.util.js";
@@ -14,9 +13,7 @@ const validateAnswerChoices = (answerChoices) => {
     throw new ApiError(400, "Exactly 8 answer choices are required.");
   }
 
-  const choiceTexts = answerChoices.map((choice) =>
-    normalizeText(choice.choiceText)
-  );
+  const choiceTexts = answerChoices.map((choice) => normalizeText(choice.text));
   const uniqueChoiceTexts = new Set(choiceTexts);
   if (uniqueChoiceTexts.size !== choiceTexts.length) {
     throw new ApiError(400, "Answer choice texts must be unique.");
@@ -69,11 +66,8 @@ const getQuestionById = async (req, res, next) => {
 };
 
 const createQuestion = async (req, res, next) => {
-  const { categoryId, questionText, timeLimit, answerChoices } = req.body;
+  const { categoryId, text, timeLimit, answerChoices } = req.body;
   const user = req.user;
-
-  console.log("Creating question with data:", req.body);
-  console.log("Time Limit: ", normalizeInteger(timeLimit) || 20);
 
   const transaction = await sequelize.transaction();
   try {
@@ -85,7 +79,7 @@ const createQuestion = async (req, res, next) => {
     const newQuestion = await Question.create(
       {
         categoryId,
-        questionText: normalizeText(questionText),
+        text: normalizeText(text),
         timeLimit: normalizeInteger(timeLimit) || 20,
         authorId: user.id,
       },
@@ -98,7 +92,7 @@ const createQuestion = async (req, res, next) => {
       await AnswerChoice.create(
         {
           questionId: newQuestion.id,
-          choiceText: choice.choiceText,
+          text: choice.text,
           isCorrect: choice.isCorrect,
         },
         { transaction }
@@ -119,7 +113,7 @@ const createQuestion = async (req, res, next) => {
 
 const updateQuestion = async (req, res, next) => {
   const { id } = req.params;
-  const { categoryId, questionText, timeLimit, answerChoices } = req.body;
+  const { categoryId, text, timeLimit, answerChoices } = req.body;
 
   const transaction = await sequelize.transaction();
   try {
@@ -143,7 +137,7 @@ const updateQuestion = async (req, res, next) => {
 
     const updatedFields = {};
     if (categoryId) updatedFields.categoryId = categoryId;
-    if (questionText) updatedFields.questionText = questionText;
+    if (text) updatedFields.text = text;
     if (timeLimit) updatedFields.timeLimit = timeLimit;
 
     if (Object.keys(updatedFields).length > 0) {
@@ -156,7 +150,7 @@ const updateQuestion = async (req, res, next) => {
       currentAnswerChoices.every((currentChoice) =>
         answerChoices.some(
           (newChoice) =>
-            newChoice.choiceText === currentChoice.choiceText &&
+            newChoice.text === currentChoice.text &&
             newChoice.isCorrect === currentChoice.isCorrect
         )
       );
@@ -170,7 +164,7 @@ const updateQuestion = async (req, res, next) => {
         await AnswerChoice.create(
           {
             questionId: question.id,
-            choiceText: choice.choiceText,
+            text: choice.text,
             isCorrect: choice.isCorrect,
           },
           { transaction }

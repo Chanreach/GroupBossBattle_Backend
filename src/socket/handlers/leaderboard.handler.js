@@ -1,14 +1,13 @@
+import battleSessionManager from "../../managers/battle-session.manager.js";
 import {
   SOCKET_EVENTS,
   SOCKET_ROOMS,
   SOCKET_MESSAGES,
 } from "../../utils/socket.constants.js";
-import battleSessionManager from "../../managers/battle-session.manager.js";
 
 const handleLeaderboard = (io, socket) => {
   socket.on(SOCKET_EVENTS.BOSS_PREVIEW.LEADERBOARD.REQUEST, async (payload) => {
     const { eventBossId } = payload;
-
     if (!eventBossId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId.",
@@ -26,7 +25,7 @@ const handleLeaderboard = (io, socket) => {
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: error.message || "Internal Server Error.",
       });
     }
   });
@@ -125,7 +124,6 @@ const handleLeaderboard = (io, socket) => {
     } catch (error) {
       console.log(error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        code: SOCKET_ERRORS.INTERNAL_SERVER,
         message: "An error occurred while fetching the podium.",
       });
     }

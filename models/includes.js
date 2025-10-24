@@ -13,6 +13,7 @@ import {
 
 export const creatorInclude = [{ model: User, as: "creator" }];
 export const authorInclude = [{ model: User, as: "author" }];
+export const eventInclude = [{ model: Event, as: "event" }];
 export const bossInclude = [{ model: Boss, as: "boss" }];
 export const categoriesInclude = [{ model: Category, as: "categories" }];
 export const categoryInclude = [{ model: Category, as: "category" }];
@@ -126,10 +127,12 @@ export const eventBossIncludes = ({
   includeBoss = false,
   includeCreator = false,
   includeCategories = false,
+  includeQuestions = false,
+  includeAnswerChoices = false,
 } = {}) => {
   const includes = [];
 
-  if (includeEvent) includes.push(...eventIncludes());
+  if (includeEvent) includes.push(...eventInclude);
 
   if (includeBoss) {
     const bossAssoc = { ...bossInclude[0] };
@@ -140,7 +143,21 @@ export const eventBossIncludes = ({
     }
 
     if (includeCategories) {
-      bossAssoc.include.push(...categoriesInclude);
+      const categoriesAssoc = { ...categoriesInclude[0] };
+      categoriesAssoc.include = [];
+
+      if (includeQuestions) {
+        const questionsAssoc = { ...questionsInclude[0] };
+        questionsAssoc.include = [];
+
+        if (includeAnswerChoices) {
+          questionsAssoc.include.push(...answerChoicesInclude);
+        }
+
+        categoriesAssoc.include.push(questionsAssoc);
+      }
+
+      bossAssoc.include.push(categoriesAssoc);
     }
 
     includes.push(bossAssoc);

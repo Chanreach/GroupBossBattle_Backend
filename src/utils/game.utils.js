@@ -1,6 +1,5 @@
 import { GAME_CONSTANTS } from "./game.constants.js";
-import RandomGenerator from "./random-generator.js";
-import { generateSeed } from "./generate-seed.js";
+import { RandomGenerator, generateSeed } from "./random.util.js";
 
 export const initializePlayerStats = () => {
   return {
@@ -113,7 +112,7 @@ export const generateUniqueRevivalCode = (
 export const generateBattleSessionId = (eventBossId) => {
   const timestamp = Date.now();
   const rng = new RandomGenerator();
-  const randomSuffix = rng.getRandomInt(0, 9999).toString().padStart(4, "0");
+  const randomSuffix = rng.getRandomInt(0, 999999).toString().padStart(6, "0");
   return `${eventBossId}-${timestamp}-${randomSuffix}`;
 };
 

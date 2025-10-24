@@ -19,7 +19,7 @@ export default {
           onUpdate: "CASCADE",
           onDelete: "CASCADE",
         },
-        choice_text: {
+        text: {
           allowNull: false,
           type: Sequelize.STRING,
         },

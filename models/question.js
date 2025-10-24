@@ -18,7 +18,7 @@ export default (sequelize, DataTypes) => {
       const details = {
         id: this.id,
         categoryId: this.categoryId,
-        questionText: this.questionText,
+        text: this.text,
         timeLimit: this.timeLimit,
         authorId: this.authorId,
         author: this.author ? this.author.getFullProfile() : null,
@@ -53,7 +53,7 @@ export default (sequelize, DataTypes) => {
           },
         },
       },
-      questionText: {
+      text: {
         type: DataTypes.STRING,
         allowNull: false,
         validate: {

@@ -1,12 +1,13 @@
 import QuestionService from "../services/question.service.js";
-import RandomGenerator from "../utils/random-generator.js";
-import { generateSeed } from "../utils/generate-seed.js";
+import { RandomGenerator, generateSeed } from "../utils/random.util.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
 
 class QuestionManager {
   async initializeQuestionBank(questionBank, eventBossId) {
     if (!questionBank || !eventBossId) {
-      console.error("Question bank or event boss ID is missing");
+      console.error(
+        "[QuestionManager] Question bank or event boss ID is missing."
+      );
       return null;
     }
 
@@ -14,7 +15,9 @@ class QuestionManager {
       eventBossId
     );
     if (!questions || questions.length === 0) {
-      console.error("No questions found for the given event boss ID");
+      console.error(
+        "[QuestionManager] No questions found for the given event boss ID."
+      );
       return null;
     }
 
@@ -39,9 +42,7 @@ class QuestionManager {
       seed
     );
     if (!processedQuestions || processedQuestions.length === 0) {
-      console.error(
-        `No processed questions available for player ${playerId}`
-      );
+      console.error(`No processed questions available for player ${playerId}`);
       return null;
     }
 

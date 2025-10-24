@@ -1,5 +1,5 @@
-import { GAME_CONSTANTS } from "../utils/game.constants.js";
 import battleSessionManager from "../managers/battle-session.manager.js";
+import { GAME_CONSTANTS } from "../utils/game.constants.js";
 
 class MatchmakingManager {
   constructor() {
@@ -18,15 +18,12 @@ class MatchmakingManager {
 
     if (!existingPlayer) {
       if (this.isNicknameTaken(eventBossId, playerInfo.nickname)) {
-        console.error("Nickname is already taken.");
+        console.error("[MatchmakingManager] Nickname is already taken.");
         return null;
       }
 
       player = {
-        id: playerInfo.id,
-        username: playerInfo.username,
-        nickname: playerInfo.nickname,
-        isGuest: playerInfo.isGuest,
+        ...playerInfo,
         contextStatus: GAME_CONSTANTS.PLAYER.CONTEXT_STATUS.IN_QUEUE,
         battleState: null,
         socketId,
@@ -36,32 +33,43 @@ class MatchmakingManager {
 
       if (this.isAbleToStartBattle(eventBossId)) {
         try {
-          const battleSession = await battleSessionManager.createBattleSession(eventBossId);
+          const battleSession = await battleSessionManager.createBattleSession(
+            eventBossId
+          );
           if (!battleSession) {
-            console.error("Failed to create battle session.");
+            console.error(
+              "[MatchmakingManager] Failed to create battle session."
+            );
             return null;
           }
 
           for (const player of this.getAllPlayers(eventBossId)) {
             const playerInfo = this.getPlayerInfo(eventBossId, player.id);
             if (!playerInfo) {
-              console.error("Player not found.");
+              console.error("[MatchmakingManager] Player not found.");
               return null;
             }
 
-            const response = await battleSessionManager.addPlayerToBattleSession(
-              eventBossId,
-              playerInfo
-            );
+            const response =
+              await battleSessionManager.addPlayerToBattleSession(
+                eventBossId,
+                playerInfo
+              );
             if (!response) {
-              console.error("Failed to add player to battle session.");
+              console.error(
+                "[MatchmakingManager] Failed to add player to battle session."
+              );
               return null;
             }
           }
 
-          const startedSession = await battleSessionManager.startBattleSession(eventBossId);
+          const startedSession = await battleSessionManager.startBattleSession(
+            eventBossId
+          );
           if (!startedSession) {
-            console.error("Failed to start battle session.");
+            console.error(
+              "[MatchmakingManager] Failed to start battle session."
+            );
             return null;
           }
 
@@ -70,13 +78,17 @@ class MatchmakingManager {
           player.contextStatus = GAME_CONSTANTS.PLAYER.CONTEXT_STATUS.IN_BATTLE;
 
           return {
-            battleSessionId: battleSessionManager.getBattleSessionId(eventBossId),
+            battleSessionId:
+              battleSessionManager.getBattleSessionId(eventBossId),
             player,
             queueSize,
             isBattleStarted: true,
           };
         } catch (error) {
-          console.error("Error creating battle session:", error);
+          console.error(
+            "[MatchmakingManager] Error creating battle session:",
+            error
+          );
           throw error;
         }
       }
@@ -92,7 +104,7 @@ class MatchmakingManager {
   removePlayerFromQueue(eventBossId, playerId) {
     const playerInfo = this.getPlayerInfo(eventBossId, playerId);
     if (!playerInfo) {
-      console.error("Player not found.");
+      console.error("[MatchmakingManager] Player not found.");
       return null;
     }
 

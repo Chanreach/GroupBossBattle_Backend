@@ -12,7 +12,7 @@ export default (sequelize, DataTypes) => {
     getDetails() {
       return {
         id: this.id,
-        choiceText: this.choiceText,
+        text: this.text,
         isCorrect: this.isCorrect,
       };
     }
@@ -36,7 +36,7 @@ export default (sequelize, DataTypes) => {
           },
         },
       },
-      choiceText: {
+      text: {
         type: DataTypes.STRING,
         allowNull: false,
         validate: {

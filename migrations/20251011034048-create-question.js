@@ -19,13 +19,13 @@ export default {
           onUpdate: "CASCADE",
           onDelete: "CASCADE",
         },
-        question_text: {
+        text: {
           allowNull: false,
           type: Sequelize.STRING,
         },
         time_limit: {
           allowNull: false,
-          defaultValue: 30,
+          defaultValue: 20,
           type: Sequelize.INTEGER,
         },
         author_id: {

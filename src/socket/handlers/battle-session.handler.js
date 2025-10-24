@@ -1,11 +1,10 @@
-import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
 import battleSessionManager from "../../managers/battle-session.manager.js";
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
 import { GAME_CONSTANTS } from "../../utils/game.constants.js";
 
 const handleBattleSession = (io, socket) => {
   socket.on(SOCKET_EVENTS.BATTLE_SESSION.JOIN, async (payload) => {
     const { eventBossId, joinCode, playerId } = payload;
-
     if (!eventBossId || !joinCode || !playerId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId, joinCode, or playerId.",
@@ -189,7 +188,6 @@ const handleBattleSession = (io, socket) => {
 
   socket.on(SOCKET_EVENTS.BATTLE_SESSION.LEAVE, (payload) => {
     const { eventBossId, playerId } = payload;
-
     if (!eventBossId || !playerId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId or playerId.",
@@ -227,7 +225,6 @@ const handleBattleSession = (io, socket) => {
 
   socket.on(SOCKET_EVENTS.BATTLE_SESSION.SIZE.REQUEST, (payload) => {
     const { eventBossId } = payload;
-
     if (!eventBossId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId.",
@@ -239,16 +236,16 @@ const handleBattleSession = (io, socket) => {
       const eventBossStatus =
         battleSessionManager.getEventBossStatus(eventBossId);
       let sessionSize = 0;
-      if (eventBossStatus && eventBossStatus === "in-battle") {
+      if (eventBossStatus === GAME_CONSTANTS.BOSS_STATUS.IN_BATTLE) {
         sessionSize = battleSessionManager.getBattleSessionSize(eventBossId);
       }
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.SIZE.RESPONSE, {
         data: { sessionSize },
       });
     } catch (error) {
-      console.log(error);
+      console.log("[BattleSessionHandler] Failed to get session size:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: error.message || "Internal Server Error.",
       });
     }
   });

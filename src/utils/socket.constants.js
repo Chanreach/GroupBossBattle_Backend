@@ -5,6 +5,11 @@ export const SOCKET_EVENTS = {
   DISCONNECT: "disconnect",
   ERROR: "error",
 
+  // ===== JOIN RESTRICTION EVENTS ===== //
+  JOIN_RESTRICTION: {
+    RESPONSE: "join-restriction:response",
+  },
+
   // ===== BOSS EVENTS ===== //
   BOSS: {
     REQUEST: "boss:request",

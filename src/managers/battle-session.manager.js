@@ -65,10 +65,10 @@ class BattleSessionManager {
         lastHit: null,
         winnerTeam: null,
       },
-      startTime: null,
-      endTime: null,
-      podiumEndTime: null,
-      cooldownEndTime: null,
+      startAt: null,
+      endAt: null,
+      podiumEndAt: null,
+      cooldownEndAt: null,
     };
 
     const eventBossInit = await this.eventBossManager.initializeEventBoss(
@@ -76,7 +76,7 @@ class BattleSessionManager {
       eventBossId
     );
     if (!eventBossInit) {
-      console.error("Failed to initialize event boss for battle session");
+      console.error("[BattleSessionManager] Failed to initialize event boss.");
       return null;
     }
 
@@ -85,7 +85,9 @@ class BattleSessionManager {
       eventBossId
     );
     if (!questionsInit) {
-      console.error("Failed to initialize question bank for battle session");
+      console.error(
+        "[BattleSessionManager] Failed to initialize question bank."
+      );
       return null;
     }
 
@@ -142,7 +144,7 @@ class BattleSessionManager {
     );
 
     battleSession.state = GAME_CONSTANTS.BATTLE_STATE.IN_PROGRESS;
-    battleSession.startTime = Date.now();
+    battleSession.startAt = Date.now();
     return battleSession;
   }
 
@@ -465,8 +467,8 @@ class BattleSessionManager {
     if (!battleSession) return null;
 
     battleSession.state = GAME_CONSTANTS.BATTLE_STATE.ENDED;
-    battleSession.endTime = Date.now();
-    battleSession.podiumEndTime = Date.now() + GAME_CONSTANTS.PODIUM_COUNTDOWN;
+    battleSession.endAt = Date.now();
+    battleSession.podiumEndAt = Date.now() + GAME_CONSTANTS.PODIUM_COUNTDOWN;
 
     const eventBoss = this.getEventBoss(eventBossId);
     if (!eventBoss) {
@@ -495,7 +497,7 @@ class BattleSessionManager {
       }
 
       if (status === GAME_CONSTANTS.BOSS_STATUS.COOLDOWN) {
-        battleSession.cooldownEndTime = updatedEventBoss.cooldownEndTime;
+        battleSession.cooldownEndAt = updatedEventBoss.cooldownEndAt;
       }
     }
     return battleSession;

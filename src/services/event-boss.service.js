@@ -26,6 +26,33 @@ class EventBossService {
     }
   }
 
+  static async getEventBossByIdAndJoinCode(eventBossId, joinCode) {
+    try {
+      const eventBoss = await EventBoss.findOne({
+        where: { id: eventBossId, joinCode },
+        include: eventBossIncludes({
+          includeEvent: true,
+          includeBoss: true,
+          includeCategories: true,
+          includeQuestions: true,
+          includeAnswerChoices: true,
+        }),
+      });
+      if (!eventBoss) {
+        console.error("[EventBossService] Event boss not found.");
+        return null;
+      }
+
+      return eventBoss.getSummary();
+    } catch (error) {
+      console.error(
+        "[EventBossService] Error getting event boss by ID:",
+        error
+      );
+      return null;
+    }
+  }
+
   static async getEventBossAndEventById(eventBossId) {
     try {
       const eventBoss = await EventBoss.findByPk(eventBossId, {
@@ -65,7 +92,10 @@ class EventBossService {
       const summaries = eventBosses.map((eb) => eb.getSummary());
       return summaries;
     } catch (error) {
-      console.error("[EventBossService] Error getting all event bosses:", error);
+      console.error(
+        "[EventBossService] Error getting all event bosses:",
+        error
+      );
       return null;
     }
   }
@@ -91,7 +121,10 @@ class EventBossService {
 
       return eventBoss;
     } catch (error) {
-      console.error("[EventBossService] Error updating event boss status:", error);
+      console.error(
+        "[EventBossService] Error updating event boss status:",
+        error
+      );
       return null;
     }
   }
