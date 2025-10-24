@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { sequelize } from "../models/index.js";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import apiRoutes from "./routes/index.js";
@@ -18,6 +19,14 @@ dotenv.config();
 const PORT = process.env.PORT || 3000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const uploadsDir = path.join(process.cwd(), "uploads");
+const profilesDir = path.join(uploadsDir, "profiles");
+const bossesDir = path.join(uploadsDir, "bosses");
+
+[uploadsDir, profilesDir, bossesDir].forEach((dir) => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
 
 const app = express();
 const server = http.createServer(app);
