@@ -59,6 +59,8 @@ const getQuestionById = async (req, res, next) => {
       throw new ApiError(404, "Question not found.");
     }
 
+    question.answerChoices.sort((a, b) => a.createdAt - b.createdAt);
+
     res.status(200).json(question);
   } catch (error) {
     next(error);

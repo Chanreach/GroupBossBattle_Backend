@@ -6,6 +6,12 @@ import { GAME_CONSTANTS } from "../utils/game.constants.js";
 class EventManager {
   constructor() {
     this.events = new Map();
+    this.io = null; // Store socket.io instance
+  }
+
+  setSocketIO(io) {
+    this.io = io;
+    console.log("[EventManager] Socket.IO instance set successfully");
   }
 
   async initializeEvents() {
@@ -29,7 +35,10 @@ class EventManager {
         oldEvent.status !== event.status &&
         event.status === "completed"
       ) {
-        battleSessionManager.endBattleSessions(event.id);
+        console.log(
+          `[EventManager] Event ${event.id} status changed to completed. Ending battle sessions...`
+        );
+        battleSessionManager.endBattleSessionsGracefully(event.id, this.io);
       }
     });
   }

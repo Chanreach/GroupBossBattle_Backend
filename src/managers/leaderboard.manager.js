@@ -56,7 +56,8 @@ class LeaderboardManager {
     const individualLeaderboard = this.individualLeaderboards.get(eventBossId);
     if (!individualLeaderboard) {
       console.error(
-        `No individual leaderboard found for event boss ${eventBossId}`
+        "[LeaderboardManager] No individual leaderboard found for event boss ID:",
+        eventBossId
       );
       return;
     }
@@ -84,7 +85,8 @@ class LeaderboardManager {
 
     if (!teamLeaderboard || !individualLeaderboard) {
       console.error(
-        `Incomplete leaderboard data for event boss ${eventBossId}`
+        "[LeaderboardManager] Incomplete leaderboard data for event boss ID:",
+        eventBossId
       );
       return null;
     }
@@ -277,7 +279,7 @@ class LeaderboardManager {
     const teamLeaderboard = this.getTeamLeaderboard(eventBossId);
     if (!teamLeaderboard.has(teamId)) {
       console.error(
-        `Team with ID ${teamId} not found in leaderboard for event boss ${eventBossId}`
+        `[LeaderboardManager] Team with ID ${teamId} not found in leaderboard for event boss ID: ${eventBossId}`
       );
       return null;
     }
@@ -288,7 +290,7 @@ class LeaderboardManager {
     const individualLeaderboard = this.getIndividualLeaderboard(eventBossId);
     if (!individualLeaderboard.has(playerId)) {
       console.error(
-        `Player with ID ${playerId} not found in leaderboard for event boss ${eventBossId}`
+        `[LeaderboardManager] Player with ID ${playerId} not found in leaderboard for event boss ID: ${eventBossId}`
       );
       return null;
     }

@@ -49,7 +49,7 @@ const handleBattleSession = (io, socket) => {
       socket.join(SOCKET_ROOMS.BATTLE_SESSION(eventBossId));
       socket.join(SOCKET_ROOMS.TEAM(eventBossId, teamId));
 
-      const currentQuestion = battleSessionManager.getCurrentQuestionForPlayer(
+      let currentQuestion = battleSessionManager.getCurrentQuestionForPlayer(
         eventBossId,
         playerId
       );
@@ -58,7 +58,7 @@ const handleBattleSession = (io, socket) => {
           eventBossId,
           playerId
         );
-      const questionEndTime = currentQuestion?.endTime ?? null;
+      const questionEndAt = currentQuestion?.endAt ?? null;
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.JOINED, {
         message: `You are in team ${teamName}`,
         data: {
@@ -71,7 +71,7 @@ const handleBattleSession = (io, socket) => {
           question: {
             currentQuestion,
             currentQuestionNumber,
-            questionEndTime,
+            questionEndAt,
           },
         },
       });
@@ -80,7 +80,7 @@ const handleBattleSession = (io, socket) => {
         socket.emit(SOCKET_EVENTS.BATTLE_SESSION.ENDED, {
           message: "The event boss has been defeated.",
           data: {
-            podiumEndTime: battleSession.podiumEndTime,
+            podiumEndAt: battleSession.podiumEndAt,
           },
         });
         return;
@@ -179,9 +179,9 @@ const handleBattleSession = (io, socket) => {
         }
       );
     } catch (error) {
-      console.log(error);
+      console.error("[BattleSessionHandler] Error updating leaderboard:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: "Internal server error while updating leaderboard.",
       });
     }
   });
@@ -243,9 +243,9 @@ const handleBattleSession = (io, socket) => {
         data: { sessionSize },
       });
     } catch (error) {
-      console.log("[BattleSessionHandler] Failed to get session size:", error);
+      console.error("[BattleSessionHandler] Failed to get session size:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal Server Error.",
+        message: "Internal server error while getting session size.",
       });
     }
   });
@@ -261,7 +261,7 @@ const handleBattleSession = (io, socket) => {
     }
 
     try {
-      let session = battleSessionManager.getBattleSession(eventBossId);
+      let session = battleSessionManager.findBattleSession(eventBossId);
       session =
         session?.state === GAME_CONSTANTS.BATTLE_STATE.ENDED ? null : session;
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.RESPONSE, {
@@ -270,16 +270,15 @@ const handleBattleSession = (io, socket) => {
         },
       });
     } catch (error) {
-      console.log(error);
+      console.error("[BattleSessionHandler] Error retrieving battle session:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: "Internal server error while retrieving battle session.",
       });
     }
   });
 
   socket.on(SOCKET_EVENTS.BATTLE_SESSION.MID_GAME.JOIN, async (payload) => {
     const { eventBossId, playerInfo } = payload;
-
     if (!eventBossId || !playerInfo) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId or playerInfo.",
@@ -305,7 +304,7 @@ const handleBattleSession = (io, socket) => {
         return;
       }
 
-      const existingPlayer = battleSessionManager.getPlayerFromBattleSession(
+      const existingPlayer = battleSessionManager.findPlayerFromBattleSession(
         eventBossId,
         playerInfo.id
       );
@@ -360,7 +359,7 @@ const handleBattleSession = (io, socket) => {
         message: "Battle is starting!",
         data: {
           battleSessionId: response.battleSessionId,
-          countdownEndTime: Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN,
+          countdownEndAt: Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN,
         },
       });
 
@@ -385,9 +384,9 @@ const handleBattleSession = (io, socket) => {
         }
       );
     } catch (error) {
-      console.log(error);
+      console.error("[BattleSessionHandler] Error joining mid-game:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: "Internal server error.",
+        message: "Internal server error while joining mid-game.",
       });
     }
   });

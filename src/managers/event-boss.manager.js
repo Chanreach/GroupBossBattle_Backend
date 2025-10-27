@@ -4,15 +4,19 @@ import { calculateBossHP } from "../utils/game.utils.js";
 class EventBossManager {
   async initializeEventBoss(battleSession, eventBossId) {
     if (!battleSession || !eventBossId) {
-      console.error("[EventBossManager] Battle session or event boss ID is missing.");
+      console.error(
+        "[EventBossManager] Battle session or event boss ID is missing."
+      );
       return null;
     }
 
-    const response = await EventBossService.getEventBossAndEventById(eventBossId);
+    const response = await EventBossService.getEventBossAndEventById(
+      eventBossId
+    );
     if (!response) {
       return null;
     }
-    
+
     battleSession.eventBoss = {
       ...response.eventBoss,
       maxHP: 0,
@@ -24,7 +28,9 @@ class EventBossManager {
 
   updateEventBossHP(eventBoss, numberOfPlayers) {
     if (!eventBoss || !numberOfPlayers || numberOfPlayers <= 0) {
-      console.error("[EventBossManager] Event boss or number of players is invalid.");
+      console.error(
+        "[EventBossManager] Event boss or number of players is invalid."
+      );
       return null;
     }
 
@@ -47,7 +53,8 @@ class EventBossManager {
       status
     );
     eventBoss.status = updatedEventBoss?.status ?? eventBoss.status;
-    eventBoss.cooldownEndTime = updatedEventBoss?.cooldownEndTime ?? eventBoss.cooldownEndTime;
+    eventBoss.cooldownEndAt =
+      updatedEventBoss?.cooldownEndAt ?? eventBoss.cooldownEndAt;
     return updatedEventBoss;
   }
 

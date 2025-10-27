@@ -23,9 +23,12 @@ const handleLeaderboard = (io, socket) => {
         data: { leaderboard },
       });
     } catch (error) {
-      console.log(error);
+      console.error(
+        "[LeaderboardHandler] Error retrieving preview leaderboard:",
+        error
+      );
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal Server Error.",
+        message: "Internal server error while retrieving preview leaderboard.",
       });
     }
   });
@@ -47,16 +50,18 @@ const handleLeaderboard = (io, socket) => {
         data: { leaderboard },
       });
     } catch (error) {
-      console.log(error);
+      console.error(
+        "[LeaderboardHandler] Error retrieving battle leaderboard:",
+        error
+      );
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: "Internal server error while retrieving battle leaderboard.",
       });
     }
   });
 
   socket.on(SOCKET_EVENTS.PODIUM.JOIN, (payload) => {
     const { eventBossId, playerId } = payload;
-
     if (!eventBossId || !playerId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId or playerId.",
@@ -122,9 +127,9 @@ const handleLeaderboard = (io, socket) => {
         data: { leaderboard, podium },
       });
     } catch (error) {
-      console.log(error);
+      console.error("[LeaderboardHandler] Error retrieving the podium:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: "An error occurred while fetching the podium.",
+        message: "Internal server error while retrieving the podium.",
       });
     }
   });

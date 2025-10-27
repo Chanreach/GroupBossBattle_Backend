@@ -76,7 +76,7 @@ class KnockoutManager {
     knockoutState.knockedOutPlayers.set(playerId, {
       isKnockedOut: true,
       revivalCode,
-      revivalEndTime: Date.now() + GAME_CONSTANTS.REVIVAL_TIMEOUT,
+      revivalEndAt: Date.now() + GAME_CONSTANTS.REVIVAL_TIMEOUT,
     });
     knockoutState.revivalCodes.add(revivalCode);
     return knockoutState.knockedOutPlayers.get(playerId);
@@ -116,7 +116,7 @@ class KnockoutManager {
       battleSessionId,
       revivalCode
     );
-    return knockedOutPlayer.revivalEndTime <= Date.now();
+    return knockedOutPlayer.revivalEndAt <= Date.now();
   }
 
   handleRevivalTimeout(battleSessionId, playerId) {
@@ -137,7 +137,7 @@ class KnockoutManager {
   handleExpiredRevivalCodes(knockoutState) {
     const now = Date.now();
     for (const [playerId, playerData] of knockoutState.knockedOutPlayers) {
-      if (playerData.revivalEndTime <= now) {
+      if (playerData.revivalEndAt <= now) {
         knockoutState.knockedOutPlayers.delete(playerId);
         knockoutState.revivalCodes.delete(playerData.revivalCode);
       }

@@ -37,14 +37,15 @@ class CombatManager {
     );
 
     if (damage > 0) {
-      const remainingHP = this.applyDamage(eventBoss, damage);
+      const actualDamage = Math.min(damage, eventBoss.currentHP);
+      const remainingHP = this.applyDamage(eventBoss, actualDamage);
       if (remainingHP === null) {
-        console.error("Failed to apply damage to event boss");
+        console.error("[CombatManager] Failed to apply damage to event boss.");
         return null;
       }
 
-      playerStats.totalDamage += damage;
-      teamStats.totalDamage += damage;
+      playerStats.totalDamage += actualDamage;
+      teamStats.totalDamage += actualDamage;
 
       if (remainingHP <= 0) {
         achievementAwards.lastHit = playerId;
@@ -63,7 +64,7 @@ class CombatManager {
       
       const remainingHearts = this.deductPlayerHearts(combatState, playerId);
       if (remainingHearts === null) {
-        console.error("Failed to deduct player hearts");
+        console.error("[CombatManager] Failed to deduct player hearts.");
         return null;
       }
     }
@@ -78,7 +79,7 @@ class CombatManager {
     teamStats.averageResponseTime =
       teamStats.totalResponseTime / teamStats.questionsAnswered;
     teamStats.accuracy = teamStats.correctAnswers / teamStats.questionsAnswered;
-    
+
     return {
       isCorrect,
       damage,
@@ -103,7 +104,7 @@ class CombatManager {
 
     const remainingHearts = this.deductPlayerHearts(combatState, playerId);
     if (remainingHearts === null) {
-      console.error("Failed to deduct player hearts");
+      console.error("[CombatManager] Failed to deduct player hearts.");
       return null;
     }
 
@@ -118,7 +119,7 @@ class CombatManager {
 
   applyDamage(eventBoss, damage) {
     if (!eventBoss) {
-      console.error("Event boss not found");
+      console.error("[CombatManager] Event boss not found.");
       return null;
     }
 
@@ -138,7 +139,7 @@ class CombatManager {
 
   getPlayerStats(combatState, playerId) {
     if (!combatState.playerStats.has(playerId)) {
-      console.error(`Player with ID ${playerId} not found in combat session`);
+      console.error(`[CombatManager] Player with ID ${playerId} not found in combat session.`);
       return null;
     }
     return combatState.playerStats.get(playerId);
@@ -146,7 +147,7 @@ class CombatManager {
 
   getTeamStats(combatState, teamId) {
     if (!combatState.teamStats.has(teamId)) {
-      console.error(`Team with ID ${teamId} not found in combat session`);
+      console.error(`[CombatManager] Team with ID ${teamId} not found in combat session.`);
       return null;
     }
     return combatState.teamStats.get(teamId);

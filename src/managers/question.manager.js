@@ -92,7 +92,7 @@ class QuestionManager {
 
     return {
       id: question.id,
-      questionText: question.questionText,
+      text: question.text,
       timeLimit:
         question.timeLimit * 1000 || GAME_CONSTANTS.DEFAULT_QUESTION_TIME_LIMIT,
       categoryId: question.categoryId,
@@ -134,12 +134,12 @@ class QuestionManager {
 
     const question = questionPool.questions[questionPool.currentIndex];
     questionPool.currentIndex += 1;
-    question.startTime = Date.now();
-    question.endTime = question.startTime + question.timeLimit;
+    question.startAt = Date.now();
+    question.endAt = question.startAt + question.timeLimit;
 
     return {
       id: question.id,
-      questionText: question.questionText,
+      text: question.text,
       timeLimit: question.timeLimit,
       categoryId: question.categoryId,
       categoryName: question.categoryName,
@@ -147,8 +147,8 @@ class QuestionManager {
         text: choice.text,
         index: choice.index,
       })),
-      startTime: question.startTime,
-      endTime: question.endTime,
+      startAt: question.startAt,
+      endAt: question.endAt,
     };
   }
 
@@ -177,7 +177,7 @@ class QuestionManager {
     const formattedAnswerChoices = shuffledAnswerChoices.map(
       (choice, index) => ({
         id: choice.id,
-        text: choice.choiceText,
+        text: choice.text,
         isCorrect: choice.isCorrect,
         index,
       })
@@ -191,7 +191,7 @@ class QuestionManager {
 
   getCurrentQuestion(questionPool) {
     if (!questionPool || questionPool.questions.length === 0) {
-      console.error("No questions available");
+      console.error("[QuestionManager] No questions available.");
       return null;
     }
     return questionPool.questions[questionPool.currentIndex - 1];
@@ -199,7 +199,7 @@ class QuestionManager {
 
   validatePlayerAnswer(question, choiceIndex) {
     if (!question) {
-      console.error("No question provided");
+      console.error("[QuestionManager] No question provided.");
       return null;
     }
     return question.correctAnswerIndex === choiceIndex;

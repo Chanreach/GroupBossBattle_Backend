@@ -30,7 +30,7 @@ const handleMatchmaking = (io, socket) => {
       );
       if (!data) {
         socket.emit(SOCKET_EVENTS.ERROR, {
-          message: "Failed to join the battle queue.",
+          message: "Failed to join the battle queue. Try again later.",
         });
         return;
       }
@@ -51,7 +51,7 @@ const handleMatchmaking = (io, socket) => {
             message: "Battle is starting!",
             data: {
               battleSessionId: data.battleSessionId,
-              countdownEndTime: Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN,
+              countdownEndAt: Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN,
             },
           }
         );
@@ -103,14 +103,13 @@ const handleMatchmaking = (io, socket) => {
       }
     } catch (error) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: "Internal server error while joining the battle queue.",
       });
     }
   });
 
   socket.on(SOCKET_EVENTS.BATTLE_QUEUE.LEAVE, (payload) => {
     const { eventBossId, playerId } = payload;
-
     if (!eventBossId || !playerId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId or playerId.",
@@ -125,7 +124,7 @@ const handleMatchmaking = (io, socket) => {
       );
       if (!data) {
         socket.emit(SOCKET_EVENTS.ERROR, {
-          message: "Failed to leave the battle queue.",
+          message: "Failed to leave the battle queue. Try again later.",
         });
         return;
       }
@@ -140,14 +139,13 @@ const handleMatchmaking = (io, socket) => {
         .emit(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.UPDATED, { data });
     } catch (error) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: "Internal server error while leaving the battle queue.",
       });
     }
   });
 
   socket.on(SOCKET_EVENTS.BATTLE_QUEUE.QUEUE_SIZE.REQUEST, (payload) => {
     const { eventBossId } = payload;
-
     if (!eventBossId) {
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Invalid eventBossId.",
@@ -163,7 +161,7 @@ const handleMatchmaking = (io, socket) => {
       });
     } catch (error) {
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: "Internal server error while retrieving queue size.",
       });
     }
   });

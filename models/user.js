@@ -72,10 +72,12 @@ export default (sequelize, DataTypes) => {
             args: [3, 32],
             msg: "Username length must be between 3 and 32 characters.",
           },
-          isAlphanumeric(value) {
-            if (this.isGuest) return;
-            if (value && !validator.isAlphanumeric(value)) {
-              throw new Error("Username can only contain letters and numbers.");
+          isValidUsername(value) {
+            const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_-]+$/;
+            if (!usernameRegex.test(value)) {
+              throw new Error(
+                "Username must start with a letter and can only contain letters, numbers, underscores, and hyphens."
+              );
             }
           },
           isUnique: async function (value) {

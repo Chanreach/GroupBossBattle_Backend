@@ -38,15 +38,17 @@ export default (sequelize, DataTypes) => {
       };
     }
   }
-  
+
   Leaderboard.init(
     {
       id: {
         type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
       userId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
           notEmpty: { msg: "User ID cannot be empty" },
           isUUID: {
@@ -57,6 +59,7 @@ export default (sequelize, DataTypes) => {
       },
       eventBossId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
           notEmpty: { msg: "Event Boss ID cannot be empty" },
           isUUID: {
@@ -67,6 +70,7 @@ export default (sequelize, DataTypes) => {
       },
       eventId: {
         type: DataTypes.UUID,
+        allowNull: false,
         validate: {
           notEmpty: { msg: "Event ID cannot be empty" },
           isUUID: {
@@ -76,37 +80,41 @@ export default (sequelize, DataTypes) => {
         },
       },
       totalDamageDealt: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.DOUBLE,
+        defaultValue: 0,
         validate: {
           min: {
-            args: 0,
-            msg: "Total damage dealt must be a positive integer",
+            args: [0],
+            msg: "Total damage dealt must be a positive number",
           },
         },
       },
       totalCorrectAnswers: {
         type: DataTypes.INTEGER,
+        defaultValue: 0,
         validate: {
           min: {
-            args: 0,
+            args: [0],
             msg: "Total correct answers must be a positive integer",
           },
         },
       },
       totalQuestionsAnswered: {
         type: DataTypes.INTEGER,
+        defaultValue: 0,
         validate: {
           min: {
-            args: 0,
+            args: [0],
             msg: "Total questions answered must be a positive integer",
           },
         },
       },
       totalBattlesParticipated: {
         type: DataTypes.INTEGER,
+        defaultValue: 0,
         validate: {
           min: {
-            args: 0,
+            args: [0],
             msg: "Total battles participated must be a positive integer",
           },
         },

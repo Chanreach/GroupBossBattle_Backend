@@ -13,8 +13,11 @@ import {
 
 export const creatorInclude = [{ model: User, as: "creator" }];
 export const authorInclude = [{ model: User, as: "author" }];
+export const userInclude = [{ model: User, as: "user" }];
 export const eventInclude = [{ model: Event, as: "event" }];
+export const badgeInclude = [{ model: Badge, as: "badge" }];
 export const bossInclude = [{ model: Boss, as: "boss" }];
+export const eventBossInclude = [{ model: EventBoss, as: "eventBoss" }];
 export const categoriesInclude = [{ model: Category, as: "categories" }];
 export const categoryInclude = [{ model: Category, as: "category" }];
 export const questionsInclude = [{ model: Question, as: "questions" }];
@@ -162,6 +165,25 @@ export const eventBossIncludes = ({
 
     includes.push(bossAssoc);
   }
+
+  return includes;
+};
+
+export const userBadgeIncludes = ({
+  includeUser = false,
+  includeBadge = false,
+  includeEventBoss = false,
+  includeEvent = false,
+} = {}) => {
+  const includes = [];
+
+  if (includeUser) includes.push(...userInclude);
+
+  if (includeBadge) includes.push(...badgeInclude);
+
+  if (includeEventBoss) includes.push(...eventBossInclude);
+
+  if (includeEvent) includes.push(...eventInclude);
 
   return includes;
 };

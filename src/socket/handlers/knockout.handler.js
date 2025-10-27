@@ -1,7 +1,4 @@
-import {
-  SOCKET_EVENTS,
-  SOCKET_ROOMS,
-} from "../../utils/socket.constants.js";
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
 import battleSessionManager from "../../managers/battle-session.manager.js";
 import { GAME_CONSTANTS } from "../../utils/game.constants.js";
 
@@ -58,9 +55,9 @@ const handleKnockout = (io, socket) => {
         });
       }
     } catch (error) {
-      console.log(error);
+      console.error("[KnockoutHandler] Error processing revival code submission:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: "An error occurred while submitting the revival code.",
+        message: "Internal server error while processing revival code submission.",
       });
     }
   });
@@ -92,9 +89,9 @@ const handleKnockout = (io, socket) => {
           message: "A teammate is out of the battle.",
         });
     } catch (error) {
-      console.log(error);
+      console.error("[KnockoutHandler] Error handling revival code expiry:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: "An error occurred while handling revival code expiry.",
+        message: "Internal server error while handling revival code expiry.",
       });
     }
   });

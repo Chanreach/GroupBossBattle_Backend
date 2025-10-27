@@ -1,4 +1,4 @@
-import { EventBoss, Boss, Event } from "../../models/index.js";
+import { EventBoss, Event } from "../../models/index.js";
 import { eventBossIncludes } from "../../models/includes.js";
 import UserService from "./user.service.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
@@ -58,7 +58,6 @@ class EventBossService {
       const eventBoss = await EventBoss.findByPk(eventBossId, {
         include: eventBossIncludes({
           includeBoss: true,
-          includeEvent: true,
         }),
       });
       if (!eventBoss) {
@@ -66,7 +65,16 @@ class EventBossService {
         return null;
       }
 
-      return eventBoss.getSummary();
+      const event = await Event.findByPk(eventBoss.eventId);
+      if (!event) {
+        console.error("[EventBossService] Event not found.");
+        return null;
+      }
+
+      return {
+        eventBoss: eventBoss.getSummary(),
+        event: event.getSummary(),
+      };
     } catch (error) {
       console.error(
         "[EventBossService] Error getting event boss and event by ID:",
@@ -110,9 +118,9 @@ class EventBossService {
 
       eventBoss.status = status;
       if (status === GAME_CONSTANTS.BOSS_STATUS.ACTIVE) {
-        eventBoss.cooldownEndTime = null;
+        eventBoss.cooldownEndAt = null;
       } else if (status === GAME_CONSTANTS.BOSS_STATUS.COOLDOWN) {
-        eventBoss.cooldownEndTime = new Date(
+        eventBoss.cooldownEndAt = new Date(
           Date.now() + eventBoss.cooldownDuration * 1000
         );
       }

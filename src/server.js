@@ -57,6 +57,9 @@ const io = new Server(server, {
 
 setupSocket(io);
 
+// Pass socket.io instance to EventManager for real-time updates
+eventManager.setSocketIO(io);
+
 const startServer = async () => {
   try {
     await sequelize.authenticate();
@@ -75,7 +78,7 @@ const startServer = async () => {
       } catch (error) {
         console.error("[EventManager] Error refreshing events:", error);
       }
-    }, 5 * 60 * 1000);
+    }, 60 * 1000);
 
     server.listen(PORT, () => {
       console.log(`Server is running on port: ${PORT}`);

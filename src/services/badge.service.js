@@ -153,13 +153,13 @@ class BadgeService {
     try {
       const badge = await Badge.findByPk(badgeId);
       if (!badge) {
-        console.error(`Badge with ID ${badgeId} not found.`);
+        console.error(`[BadgeService] Badge with ID ${badgeId} not found.`);
         return null;
       }
 
       const event = await Event.findByPk(eventId);
       if (!event) {
-        console.error(`Event with ID ${eventId} not found.`);
+        console.error(`[BadgeService] Event with ID ${eventId} not found.`);
         return null;
       }
 
@@ -173,7 +173,7 @@ class BadgeService {
       });
 
       if (!created) {
-        console.error("Player has already earned this badge.");
+        console.error("[BadgeService] Player has already earned this badge.");
         return null;
       }
 
@@ -193,7 +193,7 @@ class BadgeService {
         eventId: userBadge.eventId,
       };
     } catch (error) {
-      console.error(`Error awarding ${badgeType} badge: ${error}`);
+      console.error(`[BadgeService] Error awarding ${badgeType} badge: ${error}`);
       return null;
     }
   }

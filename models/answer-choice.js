@@ -14,6 +14,8 @@ export default (sequelize, DataTypes) => {
         id: this.id,
         text: this.text,
         isCorrect: this.isCorrect,
+        createdAt: this.createdAt,
+        updatedAt: this.updatedAt,
       };
     }
   }
@@ -66,6 +68,10 @@ export default (sequelize, DataTypes) => {
       tableName: "answer_choices",
       timestamps: true,
       underscored: true,
+      defaultScope: {
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+        order: [["createdAt", "ASC"]],
+      },
       scopes: {
         byQuestion: (questionId) => ({
           where: { questionId },

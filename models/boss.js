@@ -114,12 +114,13 @@ export default (sequelize, DataTypes) => {
       timestamps: true,
       underscored: true,
       defaultScope: {
-        order: [["createdAt", "DESC"]],
         attributes: { exclude: ["createdAt", "updatedAt"] },
+        order: [["createdAt", "ASC"]],
       },
       scopes: {
         byCreator: (creatorId) => ({
           where: { creatorId },
+          order: [["createdAt", "ASC"]],
         }),
       },
     }

@@ -7,6 +7,7 @@ import {
   Leaderboard,
   User,
 } from "../../models/index.js";
+import { userBadgeIncludes, eventBossIncludes } from "../../models/includes.js";
 import { Op } from "sequelize";
 import { getImageUrl } from "../utils/image.utils.js";
 
@@ -15,20 +16,19 @@ const getBossDefeatedCount = (userBadges) => {
 };
 
 const getAllUserBadges = async (req, res) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
 
+  try {
     const [events, badges, eventBosses, userBadges, leaderboards] =
       await Promise.all([
-        Event.findAll({
-          where: { status: { [Op.ne]: "upcoming" } },
-          order: [["startTime", "DESC"]],
-        }),
+        Event.scope("notUpcoming").findAll(),
         Badge.findAll(),
-        EventBoss.findAll({ include: [{ model: Boss, as: "boss" }] }),
+        EventBoss.findAll({
+          include: eventBossIncludes({ includeBoss: true }),
+        }),
         UserBadge.findAll({
           where: { userId },
-          include: [{ model: Badge, as: "badge" }],
+          include: userBadgeIncludes({ includeBadge: true }),
         }),
         Leaderboard.findAll({ where: { userId } }),
       ]);
@@ -144,8 +144,8 @@ const getAllUserBadges = async (req, res) => {
         id: event.id,
         name: event.name,
         status: event.status,
-        startTime: event.startTime,
-        endTime: event.endTime,
+        startAt: event.startAt,
+        endAt: event.endAt,
         totalEventBosses: eventBossesByEvent[event.id]?.length || 0,
         totalUserBadges: totalUserBadges,
         maxMilestoneBadges: milestoneBadges.length,
@@ -167,21 +167,18 @@ const getAllUserBadges = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching user badges:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error." });
   }
 };
 
 const getAllUserBadgesByEventId = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { eventId } = req.params;
-    if (!eventId) {
-      return res.status(400).json({ message: "eventId is required" });
-    }
+  const userId = req.user.id;
+  const { eventId } = req.params;
 
+  try {
     const user = await User.findByPk(userId);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found." });
     }
 
     const [event, badges, userBadges] = await Promise.all([
@@ -189,11 +186,11 @@ const getAllUserBadgesByEventId = async (req, res) => {
       Badge.findAll(),
       UserBadge.findAll({
         where: { eventId },
-        include: [{ model: User, as: "user" }],
+        include: userBadgeIncludes({ includeUser: true }),
       }),
     ]);
     if (!event) {
-      return res.status(404).json({ message: "Event not found" });
+      return res.status(404).json({ message: "Event not found." });
     }
 
     const achievementBadges = badges
@@ -201,16 +198,30 @@ const getAllUserBadgesByEventId = async (req, res) => {
       .sort((a, b) => a.name.localeCompare(b.name));
     const milestoneBadges = badges
       .filter((b) => b.type === "milestone")
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => {
+        const aHasThreshold = a.threshold !== null && a.threshold !== undefined;
+        const bHasThreshold = b.threshold !== null && b.threshold !== undefined;
 
-    const totalBadgesEarned = userBadges.length;
-    const totalBadgesRedeemed = userBadges.filter((ub) => ub.isRedeemed).length;
+        if (aHasThreshold && !bHasThreshold) return -1;
+        if (!aHasThreshold && bHasThreshold) return 1;
+        if (!aHasThreshold && !bHasThreshold)
+          return a.name.localeCompare(b.name);
+
+        return a.threshold - b.threshold;
+      });
+
+    const userBadgeSummaries = userBadges.map((ub) => ub.getSummary());
+
+    const totalBadgesEarned = userBadgeSummaries.length;
+    const totalBadgesRedeemed = userBadgeSummaries.filter(
+      (ub) => ub.isRedeemed
+    ).length;
 
     let eventBosses = [];
-    if (user.role === "admin") {
+    if (user.role === "superadmin" || user.role === "admin") {
       eventBosses = await EventBoss.findAll({
         where: { eventId },
-        include: [{ model: Boss, as: "boss" }],
+        include: eventBossIncludes({ includeBoss: true }),
       });
     } else if (user.role === "host") {
       const createdBosses = await Boss.findAll({
@@ -219,18 +230,17 @@ const getAllUserBadgesByEventId = async (req, res) => {
       const createdBossIds = createdBosses.map((b) => b.id);
       eventBosses = await EventBoss.findAll({
         where: { eventId, bossId: { [Op.in]: createdBossIds } },
-        include: [{ model: Boss, as: "boss" }],
+        include: eventBossIncludes({ includeBoss: true }),
       });
     }
+    const eventBossSummaries = eventBosses.map((eb) => eb.getSummary());
 
     const usersMap = new Map();
     for (const ub of userBadges) {
       const userEntry = usersMap.get(ub.userId) || {
         id: ub.user.id,
         name: ub.user.username,
-        profileImage: ub.user.profileImage
-          ? getImageUrl(ub.user.profileImage)
-          : null,
+        profileImage: ub.user.profileImage,
         eventBosses: [],
         milestoneBadges: [],
       };
@@ -240,24 +250,26 @@ const getAllUserBadgesByEventId = async (req, res) => {
     for (const [userId, userEntry] of usersMap.entries()) {
       const userBadgesForUser = userBadges.filter((ub) => ub.userId === userId);
 
-      userEntry.milestoneBadges = milestoneBadges.map((mb) => {
-        const userBadge = userBadgesForUser.find(
-          (ub) => ub.badgeId === mb.id && ub.eventBossId === null
-        );
-        return {
-          id: mb.id,
-          name: mb.name,
-          image: mb.image,
-          description: mb.description,
-          code: mb.code,
-          type: mb.type,
-          threshold: mb.threshold,
-          earnedAt: userBadge?.earnedAt || null,
-          isRedeemed: userBadge?.isRedeemed || false,
-          isEarned: !!userBadge,
-          userBadgeId: userBadge?.id || null,
-        };
-      });
+      if (user.role === "superadmin" || user.role === "admin") {
+        userEntry.milestoneBadges = milestoneBadges.map((mb) => {
+          const userBadge = userBadgesForUser.find(
+            (ub) => ub.badgeId === mb.id && ub.eventBossId === null
+          );
+          return {
+            id: mb.id,
+            name: mb.name,
+            image: mb.image,
+            description: mb.description,
+            code: mb.code,
+            type: mb.type,
+            threshold: mb.threshold,
+            earnedAt: userBadge?.earnedAt || null,
+            isRedeemed: userBadge?.isRedeemed || false,
+            isEarned: !!userBadge,
+            userBadgeId: userBadge?.id || null,
+          };
+        });
+      }
 
       userEntry.eventBosses = eventBosses.map((eventBoss) => {
         const userBadgesForBoss = userBadgesForUser.filter(
@@ -300,8 +312,8 @@ const getAllUserBadgesByEventId = async (req, res) => {
         id: event.id,
         name: event.name,
         status: event.status,
-        startTime: event.startTime,
-        endTime: event.endTime,
+        startAt: event.startAt,
+        endAt: event.endAt,
         totalEventBosses: eventBosses.length,
         totalBadgesEarned,
         totalBadgesRedeemed,
@@ -311,29 +323,20 @@ const getAllUserBadgesByEventId = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching user badges by event ID:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error." });
   }
 };
 
 const updateUserBadge = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const isRedeemed = req.body.isRedeemed;
-    const { id } = req.params;
-    if (!id) {
-      console.error("User Badge ID is required");
-      return res.status(400).json({ message: "User Badge ID is required" });
-    }
+  const userId = req.user.id;
+  const isRedeemed = req.body.isRedeemed;
+  const { id } = req.params;
 
+  try {
     const [user, userBadge] = await Promise.all([
       User.findByPk(userId),
       UserBadge.findByPk(id, {
-        include: [
-          {
-            model: Badge,
-            as: "badge",
-          },
-        ],
+        include: userBadgeIncludes({ includeBadge: true }),
       }),
     ]);
     if (!userBadge) {
@@ -360,7 +363,7 @@ const updateUserBadge = async (req, res) => {
       .json({ message: "User Badge has been updated successfully." });
   } catch (error) {
     console.error("Error updating user badge by ID: ", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error." });
   }
 };
 

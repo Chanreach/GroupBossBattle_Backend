@@ -8,7 +8,9 @@ import badgeManager from "../managers/badge.manager.js";
 import leaderboardManager from "./leaderboard.manager.js";
 import EventBossService from "../services/event-boss.service.js";
 import { generateBattleSessionId, compareScores } from "../utils/game.utils.js";
+import { SOCKET_EVENTS } from "../utils/socket.constants.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
+import eventBus from "../utils/event-bus.util.js";
 
 class BattleSessionManager {
   constructor() {
@@ -33,13 +35,13 @@ class BattleSessionManager {
 
     const eventStatus = this.getEventStatus(eventBoss.eventId);
     if (eventStatus !== GAME_CONSTANTS.EVENT_STATUS.ONGOING) {
-      console.log(
+      console.error(
         "[BattleSessionManager] Cannot create battle session. Event is not ongoing."
       );
       return null;
     }
 
-    const existingSession = this.getBattleSession(eventBossId);
+    const existingSession = this.findBattleSession(eventBossId);
     if (existingSession?.state === GAME_CONSTANTS.BATTLE_STATE.ENDED) {
       this.deleteBattleSession(existingSession.id);
     }
@@ -106,7 +108,9 @@ class BattleSessionManager {
       battleSession.eventBoss.numberOfTeams
     );
     if (!teamsCreated) {
-      console.error("Failed to create teams for battle session");
+      console.error(
+        "[BattleSessionManager] Failed to create teams for battle session."
+      );
       return null;
     }
 
@@ -119,7 +123,9 @@ class BattleSessionManager {
         player.id
       );
       if (!playerInit) {
-        console.error("Failed to initialize player session");
+        console.error(
+          "[BattleSessionManager] Failed to initialize player session."
+        );
         return null;
       }
     }
@@ -129,7 +135,9 @@ class BattleSessionManager {
       GAME_CONSTANTS.BOSS_STATUS.IN_BATTLE
     );
     if (!updatedEventBoss) {
-      console.error("Failed to update event boss status");
+      console.error(
+        "[BattleSessionManager] Failed to update event boss status."
+      );
       return null;
     }
 
@@ -150,14 +158,16 @@ class BattleSessionManager {
 
   async startBattleSession(eventBossId) {
     if (!this.canStartBattleSession(eventBossId)) {
-      console.error("Cannot start battle session");
+      console.error("[BattleSessionManager] Cannot start battle session.");
       return null;
     }
 
     if (!this.isBattleSessionStarted(eventBossId)) {
       const battleSessionInit = await this.initializeBattleSession(eventBossId);
       if (!battleSessionInit) {
-        console.error("Failed to initialize battle session");
+        console.error(
+          "[BattleSessionManager] Failed to initialize battle session."
+        );
         return null;
       }
     }
@@ -171,13 +181,13 @@ class BattleSessionManager {
 
     const eventStatus = this.getEventStatus(battleSession.event.id);
     if (eventStatus !== GAME_CONSTANTS.EVENT_STATUS.ONGOING) {
-      console.log(
+      console.error(
         "[BattleSessionManager] Cannot add player. Event is not ongoing."
       );
       return null;
     }
 
-    const existingPlayer = this.getPlayerFromBattleSession(
+    const existingPlayer = this.findPlayerFromBattleSession(
       eventBossId,
       playerInfo.id
     );
@@ -190,17 +200,23 @@ class BattleSessionManager {
           playerInfo.id
         );
         if (!removedPlayer) {
-          console.error("Failed to remove existing player from battle session");
+          console.error(
+            "[BattleSessionManager] Failed to remove existing player from battle session."
+          );
           return null;
         }
       } else {
-        console.error("Player is already in the battle session");
+        console.error(
+          "[BattleSessionManager] Player is already in the battle session."
+        );
         return null;
       }
     }
 
     if (this.isNicknameTaken(eventBossId, playerInfo.nickname)) {
-      console.error("Nickname already taken in this battle session");
+      console.error(
+        "[BattleSessionManager] Nickname already taken in this battle session."
+      );
       return null;
     }
 
@@ -218,7 +234,9 @@ class BattleSessionManager {
         player.id
       );
       if (!playerInit) {
-        console.error("Failed to initialize player session");
+        console.error(
+          "[BattleSessionManager] Failed to initialize player session."
+        );
         return null;
       }
     }
@@ -228,7 +246,7 @@ class BattleSessionManager {
       battleSession.players.size
     );
     if (!updatedEventBoss) {
-      console.error("Failed to update event boss HP");
+      console.error("[BattleSessionManager] Failed to update event boss HP.");
       return null;
     }
 
@@ -260,7 +278,9 @@ class BattleSessionManager {
       playerId
     );
     if (!teamId) {
-      console.error("Failed to assign player to a team");
+      console.error(
+        "[BattleSessionManager] Failed to assign player to a team."
+      );
       return null;
     }
     player.teamId = teamId;
@@ -271,7 +291,9 @@ class BattleSessionManager {
       player.id
     );
     if (!questionPool) {
-      console.error("Failed to prepare question pool for player");
+      console.error(
+        "[BattleSessionManager] Failed to prepare question pool for player."
+      );
       return null;
     }
 
@@ -291,7 +313,9 @@ class BattleSessionManager {
   addPlayerToLeaderboard(eventBossId, playerId) {
     const player = this.getPlayerFromBattleSession(eventBossId, playerId);
     if (!player) {
-      console.error("Player not found in battle session");
+      console.error(
+        "[BattleSessionManager] Player not found in battle session."
+      );
       return null;
     }
 
@@ -328,7 +352,7 @@ class BattleSessionManager {
 
     const question = this.getCurrentQuestionForPlayer(eventBossId, playerId);
     if (!question) {
-      console.error("No current question for player");
+      console.error("[BattleSessionManager] No current question for player.");
       return null;
     }
 
@@ -350,7 +374,9 @@ class BattleSessionManager {
         choiceIndex
       );
       if (isCorrect === null) {
-        console.error("Failed to validate player answer");
+        console.error(
+          "[BattleSessionManager] Failed to validate player answer."
+        );
         return null;
       }
 
@@ -366,7 +392,7 @@ class BattleSessionManager {
       );
     }
     if (!answerResult) {
-      console.error("Failed to process player answer");
+      console.error("[BattleSessionManager] Failed to process player answer.");
       return null;
     }
 
@@ -400,32 +426,12 @@ class BattleSessionManager {
 
     const isEventBossDefeated = this.isEventBossDefeated(eventBossId);
     if (isEventBossDefeated) {
-      const defeatedBattleSession = await this.handleEventBossDefeat(
-        eventBossId
-      );
-      if (!defeatedBattleSession) {
-        console.error("Failed to handle event boss defeat");
+      const finalizedSession = await this.finalizeBattleSessionEnd(eventBossId);
+      if (!finalizedSession) {
+        console.error(
+          "[BattleSessionManager] Failed to finalize battle session end."
+        );
         return null;
-      }
-
-      await this.awardAchievementBadgesToAllPlayers(eventBossId);
-      await this.awardHeroBadgesToEligiblePlayers(eventBossId);
-
-      for (const player of battleSession.players.values()) {
-        const playerStats = this.combatManager.getPlayerStats(
-          battleSession.combat,
-          player.id
-        );
-        await this.leaderboardManager.updateEventBossAllTimeLeaderboard(
-          player.id,
-          battleSession.event.id,
-          eventBossId,
-          {
-            totalDamage: playerStats ? playerStats.totalDamage : 0,
-            correctAnswers: playerStats ? playerStats.correctAnswers : 0,
-            questionsAnswered: playerStats ? playerStats.questionsAnswered : 0,
-          }
-        );
       }
     }
 
@@ -462,15 +468,16 @@ class BattleSessionManager {
     );
   }
 
-  async handleEventBossDefeat(eventBossId) {
+  async finalizeBattleSessionEnd(eventBossId) {
     const battleSession = this.getBattleSession(eventBossId);
     if (!battleSession) return null;
 
     battleSession.state = GAME_CONSTANTS.BATTLE_STATE.ENDED;
     battleSession.endAt = Date.now();
-    battleSession.podiumEndAt = Date.now() + GAME_CONSTANTS.PODIUM_COUNTDOWN;
+    battleSession.podiumEndAt =
+      Date.now() + GAME_CONSTANTS.PODIUM_COUNTDOWN + 1000;
 
-    const eventBoss = this.getEventBoss(eventBossId);
+    const eventBoss = battleSession.eventBoss;
     if (!eventBoss) {
       console.error("[BattleSessionManager] Event boss not found.");
       return null;
@@ -500,6 +507,28 @@ class BattleSessionManager {
         battleSession.cooldownEndAt = updatedEventBoss.cooldownEndAt;
       }
     }
+
+    await this.awardAchievementBadgesToAllPlayers(eventBossId);
+    await this.awardHeroBadgesToEligiblePlayers(eventBossId);
+
+    for (const player of battleSession.players.values()) {
+      const playerStats = this.combatManager.getPlayerStats(
+        battleSession.combat,
+        player.id
+      );
+
+      await this.leaderboardManager.updateEventBossAllTimeLeaderboard(
+        player.id,
+        battleSession.event.id,
+        eventBossId,
+        {
+          totalDamage: playerStats ? playerStats.totalDamage : 0,
+          correctAnswers: playerStats ? playerStats.correctAnswers : 0,
+          questionsAnswered: playerStats ? playerStats.questionsAnswered : 0,
+        }
+      );
+    }
+
     return battleSession;
   }
 
@@ -517,7 +546,7 @@ class BattleSessionManager {
     if (!battleSession) return null;
 
     if (battleSession.state !== GAME_CONSTANTS.BATTLE_STATE.ENDED) {
-      console.error("Battle session is not ended");
+      console.error("[BattleSessionManager] Battle session is not ended.");
       return null;
     }
 
@@ -533,7 +562,10 @@ class BattleSessionManager {
           GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.MVP
         );
         if (!badgeData) {
-          console.error("Failed to award MVP badge to player:", player.id);
+          console.error(
+            "[BattleSessionManager] Failed to award MVP badge to player:",
+            player.id
+          );
         }
       }
       if (player.teamId === winnerTeamId) {
@@ -545,7 +577,7 @@ class BattleSessionManager {
         );
         if (!badgeData) {
           console.error(
-            "Failed to award boss defeated badge to player:",
+            "[BattleSessionManager] Failed to award boss defeated badge to player:",
             player.id
           );
         }
@@ -558,7 +590,10 @@ class BattleSessionManager {
           GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.LAST_HIT
         );
         if (!badgeData) {
-          console.error("Failed to award last hit badge to player:", player.id);
+          console.error(
+            "[BattleSessionManager] Failed to award last hit badge to player:",
+            player.id
+          );
         }
       }
     }
@@ -569,7 +604,7 @@ class BattleSessionManager {
     if (!battleSession) return null;
 
     if (battleSession.state !== GAME_CONSTANTS.BATTLE_STATE.ENDED) {
-      console.error("Battle session is not ended");
+      console.error("[BattleSessionManager] Battle session is not ended.");
       return null;
     }
 
@@ -586,7 +621,10 @@ class BattleSessionManager {
           badgeCode
         );
         if (!badgeData) {
-          console.error("Failed to award hero badge to player:", player.id);
+          console.error(
+            "[BattleSessionManager] Failed to award hero badge to player:",
+            player.id
+          );
         }
       }
     }
@@ -975,6 +1013,31 @@ class BattleSessionManager {
     }
   }
 
+  async endBattleSessionsGracefully(eventId) {
+    for (const battleSession of this.battleSessions.values()) {
+      if (battleSession.event.id === eventId) {
+        const eventBossId = battleSession.eventBoss.id;
+
+        if (battleSession.state === GAME_CONSTANTS.BATTLE_STATE.IN_PROGRESS) {
+          const finalizedSession = await this.finalizeBattleSessionEnd(
+            eventBossId
+          );
+          if (!finalizedSession) {
+            console.error(
+              "[BattleSessionManager] Failed to finalize battle session end."
+            );
+            continue;
+          }
+
+          eventBus.emit(SOCKET_EVENTS.EVENT.ENDED, {
+            eventBossId: battleSession.eventBoss.id,
+            podiumEndAt: finalizedSession.podiumEndAt,
+          });
+        }
+      }
+    }
+  }
+
   getBattleSessionId(eventBossId) {
     for (const battleSession of this.battleSessions.values()) {
       if (battleSession.eventBoss.id === eventBossId) {
@@ -987,9 +1050,14 @@ class BattleSessionManager {
   getBattleSession(eventBossId) {
     const battleSessionId = this.getBattleSessionId(eventBossId);
     if (!this.battleSessions.has(battleSessionId)) {
-      console.error("Battle session not found");
+      console.error("[BattleSessionManager] Battle session not found.");
       return null;
     }
+    return battleSessionId ? this.battleSessions.get(battleSessionId) : null;
+  }
+
+  findBattleSession(eventBossId) {
+    const battleSessionId = this.getBattleSessionId(eventBossId);
     return battleSessionId ? this.battleSessions.get(battleSessionId) : null;
   }
 
@@ -1015,27 +1083,34 @@ class BattleSessionManager {
   }
 
   getBattleSessionSize(eventBossId) {
-    const battleSession = this.getBattleSession(eventBossId);
+    const battleSession = this.findBattleSession(eventBossId);
     return battleSession ? battleSession.players.size : 0;
   }
 
   getEventBoss(eventBossId) {
-    const battleSession = this.getBattleSession(eventBossId);
+    const battleSession = this.findBattleSession(eventBossId);
     return battleSession?.eventBoss;
   }
 
   getEventBossStatus(eventBossId) {
-    const battleSession = this.getBattleSession(eventBossId);
+    const battleSession = this.findBattleSession(eventBossId);
     return battleSession ? battleSession.eventBoss.status : null;
   }
 
   getPlayerFromBattleSession(eventBossId, playerId) {
     const battleSession = this.getBattleSession(eventBossId);
     if (!battleSession?.players.has(playerId)) {
-      console.error("Player not found in battle session");
+      console.error(
+        "[BattleSessionManager] Player not found in battle session."
+      );
       return null;
     }
     return battleSession.players.get(playerId);
+  }
+
+  findPlayerFromBattleSession(eventBossId, playerId) {
+    const battleSession = this.getBattleSession(eventBossId);
+    return battleSession?.players.get(playerId) || null;
   }
 
   getPlayerTeamInfo(eventBossId, playerId) {

@@ -1,3 +1,4 @@
+import handleEvent from "./handlers/event.handler.js";
 import handleEventBoss from "./handlers/event-boss.handler.js";
 import handleBossPreview from "./handlers/boss-preview.handler.js";
 import handleMatchmaking from "./handlers/matchmaking.handler.js";
@@ -11,6 +12,7 @@ const setupSocket = (io) => {
   io.on("connection", (socket) => {
     console.log("New user connected:", socket.id);
 
+    handleEvent(io, socket);
     handleEventBoss(io, socket);
     handleBossPreview(io, socket);
     handleMatchmaking(io, socket);

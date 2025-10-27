@@ -45,21 +45,6 @@ class LeaderboardService {
     }
   }
 
-  static async getPlayerStatsByEventBossId(userId, eventBossId) {
-    try {
-      const leaderboardEntry = await Leaderboard.findOne({
-        where: {
-          userId,
-          eventBossId,
-        },
-      });
-      return leaderboardEntry;
-    } catch (error) {
-      console.error("Error fetching player stats:", error);
-      return null;
-    }
-  }
-
   static async getPlayerStatsByEventId(userId, eventId) {
     try {
       const leaderboardEntry = await Leaderboard.findAll({
@@ -103,7 +88,7 @@ class LeaderboardService {
           }
         : null;
     } catch (error) {
-      console.error("Error fetching player stats:", error);
+      console.error("[LeaderboardService] Error fetching player stats:", error);
       return null;
     }
   }
@@ -147,7 +132,7 @@ class LeaderboardService {
             }
           } catch (lookupError) {
             console.warn(
-              `Could not resolve player name for ID ${entry.userId}`
+              `[LeaderboardService] Could not resolve player name for ID ${entry.userId}`
             );
           }
           return {
@@ -222,7 +207,7 @@ class LeaderboardService {
             }
           } catch (lookupError) {
             console.warn(
-              `Could not resolve player name for ID ${entry.userId}`
+              `[LeaderboardService] Could not resolve player name for ID ${entry.userId}`
             );
           }
           return {
@@ -243,7 +228,10 @@ class LeaderboardService {
       );
       return enrichedEntries;
     } catch (error) {
-      console.error("Error fetching event all-time leaderboard:", error);
+      console.error(
+        "[LeaderboardService] Error fetching event all-time leaderboard:",
+        error
+      );
       return null;
     }
   }

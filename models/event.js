@@ -1,4 +1,5 @@
 import { Model } from "sequelize";
+import { Op } from "sequelize";
 
 export default (sequelize, DataTypes) => {
   class Event extends Model {
@@ -126,7 +127,7 @@ export default (sequelize, DataTypes) => {
             event.status = "ongoing";
           }
         },
-        beforeUpdate: (event) => {
+        beforeUpdate: async (event) => {
           const now = new Date();
           if (event.startAt && event.endAt) {
             if (now >= new Date(event.endAt)) {
@@ -136,6 +137,23 @@ export default (sequelize, DataTypes) => {
             } else {
               event.status = "upcoming";
             }
+          }
+
+          const eventBosses = await sequelize.models.EventBoss.findAll({
+            where: { eventId: event.id },
+          });
+          for (const eventBoss of eventBosses) {
+            if (event.status === "ongoing") {
+              if (eventBoss.status === "pending") {
+                eventBoss.status = "active";
+              }
+            } else {
+              eventBoss.status = "pending";
+            }
+            await eventBoss.update(
+              { status: eventBoss.status },
+              { hooks: false }
+            );
           }
         },
       },
@@ -152,6 +170,9 @@ export default (sequelize, DataTypes) => {
         },
         completed: {
           where: { status: "completed" },
+        },
+        notUpcoming: {
+          where: { status: { [Op.ne]: "upcoming" } },
         },
       },
     }

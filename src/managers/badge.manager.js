@@ -44,7 +44,7 @@ class BadgeManager {
         continue;
       }
       if (totalCorrectAnswers >= milestone.threshold) {
-        console.log(`Player ${playerId} is eligible for milestone badge ${milestone.code} with total correct answers: ${totalCorrectAnswers}`);
+        console.log(`[BadgeManager] Player ${playerId} is eligible for milestone badge ${milestone.code} with total correct answers: ${totalCorrectAnswers}`);
         return milestone.code;
       }
     }
@@ -88,12 +88,12 @@ class BadgeManager {
 
     const badge = this.getBadgeByCode(badgeCode);
     if (!badge) {
-      console.error("Badge not found.");
+      console.error("[BadgeManager] Badge not found.");
       return null;
     }
 
     if (this.hasEarnedBadge(playerBadges, eventId, eventBossId, badge.code)) {
-      console.error("Player has already earned this badge.");
+      console.error("[BadgeManager] Player has already earned this badge.");
       return null;
     }
 
@@ -107,7 +107,7 @@ class BadgeManager {
     if (badgeData) {
       playerBadges.push({ ...badgeData, shouldAward: true });
     } else {
-      console.error("Failed to award badge.");
+      console.error("[BadgeManager] Failed to award badge.");
       return null;
     }
 

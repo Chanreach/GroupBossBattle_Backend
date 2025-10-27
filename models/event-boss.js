@@ -139,6 +139,10 @@ export default (sequelize, DataTypes) => {
       tableName: "event_bosses",
       timestamps: true,
       underscored: true,
+      defaultScope: {
+        attributes: { exclude: ["createdAt", "updatedAt"] },
+        order: [["createdAt", "ASC"]],
+      },
       hooks: {
         beforeCreate: async (eventBoss) => {
           const event = await sequelize.models.Event.findByPk(
@@ -150,7 +154,9 @@ export default (sequelize, DataTypes) => {
           const event = await sequelize.models.Event.findByPk(
             eventBoss.eventId
           );
-          if (event?.status === "ongoing") eventBoss.status = "active";
+          if (event?.status === "ongoing" && eventBoss.status === "pending") {
+            eventBoss.status = "active";
+          }
         },
       },
       scopes: {

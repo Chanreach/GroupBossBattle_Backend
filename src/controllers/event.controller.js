@@ -72,6 +72,7 @@ const getEventById = async (req, res, next) => {
         includeCreator: true,
         includeCategories: true,
       }),
+      order: [["createdAt", "ASC"]],
     });
     if (!event) {
       throw new ApiError(404, "Event not found.");
@@ -170,6 +171,7 @@ const getAvailableBossesForEvent = async (req, res, next) => {
 
     const eventBosses = await EventBoss.findAll({
       where: { eventId, bossId: { [Op.in]: bossIds } },
+      order: [["createdAt", "ASC"]],
     });
 
     const assignedBossIds = eventBosses.map((eb) => eb.bossId);
@@ -286,6 +288,7 @@ const unassignBossFromEvent = async (req, res, next) => {
     const eventBosses = await EventBoss.findAll({
       where: { id: { [Op.in]: uniqueEventBossIds }, eventId },
       include: eventBossIncludes({ includeBoss: true }),
+      order: [["createdAt", "ASC"]],
     });
     if (eventBosses.length === 0) {
       throw new ApiError(400, "No valid event bosses found to unassign.");

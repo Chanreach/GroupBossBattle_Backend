@@ -1,3 +1,4 @@
+import battleSessionManager from "../../managers/battle-session.manager.js";
 import EventBossService from "../../services/event-boss.service.js";
 import { SOCKET_EVENTS } from "../../utils/socket.constants.js";
 import { GAME_CONSTANTS } from "../../utils/game.constants.js";
@@ -24,6 +25,24 @@ const handleEventBoss = (io, socket) => {
         return;
       }
 
+      const battleSession = battleSessionManager.findBattleSession(eventBossId);
+      if (
+        !battleSession &&
+        eventBoss.status !== GAME_CONSTANTS.BOSS_STATUS.PENDING
+      ) {
+        const updatedEventBoss = await EventBossService.updateEventBossStatus(
+          eventBossId,
+          GAME_CONSTANTS.BOSS_STATUS.ACTIVE
+        );
+        if (!updatedEventBoss) {
+          console.error(
+            "[EventBossHandler] Failed to update event boss status."
+          );
+        }
+
+        eventBoss.status = updatedEventBoss?.status;
+      }
+
       socket.emit(SOCKET_EVENTS.BOSS.RESPONSE, {
         message: "Successfully retrieved event boss.",
         data: { eventBoss },
@@ -31,10 +50,14 @@ const handleEventBoss = (io, socket) => {
 
       const event = eventBoss.event;
       if (event?.status !== GAME_CONSTANTS.EVENT_STATUS.ONGOING) {
+        const reason =
+          event?.status === GAME_CONSTANTS.EVENT_STATUS.COMPLETED
+            ? "The event has ended. \nThank you for participating."
+            : "You cannot join the battle right now. \nThe event is not currently ongoing.";
         socket.emit(SOCKET_EVENTS.JOIN_RESTRICTION.RESPONSE, {
           data: {
             isJoinable: false,
-            reason: "Event is not currently ongoing.",
+            reason,
           },
         });
         return;
@@ -65,8 +88,9 @@ const handleEventBoss = (io, socket) => {
         return;
       }
     } catch (error) {
+      console.error("[EventBossHandler] Error retrieving event boss:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal Server Error.",
+        message: "Internal server error while retrieving event boss.",
       });
     }
   });

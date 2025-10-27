@@ -29,9 +29,9 @@ const handleCombat = (io, socket) => {
         data: { currentQuestion },
       });
     } catch (error) {
-      console.log(error);
+      console.error("[CombatHandler] Error retrieving the next question:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: "Internal server error while retrieving the next question.",
       });
     }
   });
@@ -140,9 +140,9 @@ const handleCombat = (io, socket) => {
           {
             message: "The event boss has been defeated!",
             data: {
-              podiumEndTime:
+              podiumEndAt:
                 battleSessionManager.getBattleSession(eventBossId)
-                  ?.podiumEndTime,
+                  ?.podiumEndAt,
             },
           }
         );
@@ -167,7 +167,7 @@ const handleCombat = (io, socket) => {
           }
         );
 
-        const reactivatedTimeout = updateEventBoss.cooldownEndTime - Date.now();
+        const reactivatedTimeout = updateEventBoss.cooldownEndAt - Date.now();
         setTimeout(async () => {
           const reactivatedEventBoss =
             await battleSessionManager.updateEventBossStatus(
@@ -216,9 +216,9 @@ const handleCombat = (io, socket) => {
         }
       );
     } catch (error) {
-      console.log(error);
+      console.error("[CombatHandler] Error processing combat action:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: error.message || "Internal server error.",
+        message: "Internal server error while processing combat action.",
       });
     }
   });
