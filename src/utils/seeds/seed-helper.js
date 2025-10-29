@@ -18,6 +18,7 @@ export const prepareSeedQuestions = (questions, categoryId, authorId) => {
         question_id: questionId,
         text: answerChoice.text,
         is_correct: answerChoice.isCorrect,
+        order: answerChoice.order,
       });
     }
   }

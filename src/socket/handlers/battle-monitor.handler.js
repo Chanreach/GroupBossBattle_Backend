@@ -1,9 +1,7 @@
-import {
-  SOCKET_EVENTS,
-  SOCKET_ROOMS,
-} from "../../utils/socket.constants.js";
 import battleSessionManager from "../../managers/battle-session.manager.js";
+import EventService from "../../services/event.service.js";
 import EventBossService from "../../services/event-boss.service.js";
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../../utils/socket.constants.js";
 import { GAME_CONSTANTS } from "../../utils/game.constants.js";
 
 const handleBattleMonitor = (io, socket) => {
@@ -12,12 +10,12 @@ const handleBattleMonitor = (io, socket) => {
       const { eventId, eventBossId, spectatorId } = payload;
       if (!eventId || !eventBossId || !spectatorId) {
         socket.emit(SOCKET_EVENTS.ERROR, {
-          message: SOCKET_ERRORS.MISSING_DATA,
+          message: "Invalid eventId, eventBossId, or spectatorId.",
         });
         return;
       }
 
-      const event = await EventBossService.getEventById(eventId);
+      const event = await EventService.getEventById(eventId);
       const response = await EventBossService.getEventBossById(eventBossId);
 
       const isAllowedToSpectate = await EventBossService.isAllowedToSpectate(
@@ -26,16 +24,16 @@ const handleBattleMonitor = (io, socket) => {
       );
       if (!isAllowedToSpectate) {
         socket.emit(SOCKET_EVENTS.BATTLE_MONITOR.UNAUTHORIZED, {
-          message: "You are not authorized to spectate this battle session.",
+          message:
+            "Forbidden: You are not authorized to spectate this battle session.",
         });
         return;
       }
 
       socket.join(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId));
 
-      const battleSession = battleSessionManager.getBattleSession(eventBossId);
+      const battleSession = battleSessionManager.findBattleSession(eventBossId);
       let eventBoss = null;
-      let battleState = null;
       let activePlayers = 0;
       let leaderboard = {
         teamLeaderboard: [],
@@ -43,9 +41,6 @@ const handleBattleMonitor = (io, socket) => {
         allTimeLeaderboard: [],
       };
       if (battleSession) {
-        eventBoss = battleSession.eventBoss;
-        battleState = battleSession.battleState;
-        activePlayers = battleSessionManager.getActivePlayersCount(eventBossId);
         const { teamLeaderboard, individualLeaderboard, allTimeLeaderboard } =
           await battleSessionManager.getPreviewLiveLeaderboard(eventBossId);
         leaderboard = {
@@ -54,11 +49,6 @@ const handleBattleMonitor = (io, socket) => {
           allTimeLeaderboard,
         };
       } else {
-        eventBoss = {
-          ...response.eventBoss,
-          maxHP: 0,
-          currentHP: 0,
-        }
         const allTimeLeaderboard =
           await battleSessionManager.leaderboardManager.getEventBossAllTimeLeaderboard(
             eventBossId
@@ -69,18 +59,32 @@ const handleBattleMonitor = (io, socket) => {
           allTimeLeaderboard,
         };
       }
+
+      if (battleSession && battleSession.state !== GAME_CONSTANTS.BATTLE_STATE.ENDED) {
+        eventBoss = battleSession.eventBoss;
+        activePlayers = battleSessionManager.getActivePlayersCount(eventBossId);
+      } else {
+        eventBoss = {
+          ...response,
+          currentHP: 0,
+          maxHP: 0,
+        };
+        activePlayers = 0;
+      }
       socket.emit(SOCKET_EVENTS.BATTLE_MONITOR.JOINED, {
         message: `Joined battle monitor for eventBossId: ${eventBossId}`,
         data: {
           event,
           eventBoss,
-          battleState,
           activePlayers,
           leaderboard,
         },
       });
     } catch (error) {
-      console.error("Error handling battle monitor join:", error);
+      console.error(
+        "[BattleMonitorHandler] Error handling battle monitor join:",
+        error
+      );
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: error.message,
       });
@@ -92,17 +96,20 @@ const handleBattleMonitor = (io, socket) => {
       const { eventBossId } = payload;
       if (!eventBossId) {
         socket.emit(SOCKET_EVENTS.ERROR, {
-          message: SOCKET_ERRORS.MISSING_DATA,
+          message: "Invalid eventBossId.",
         });
         return;
       }
 
       socket.leave(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId));
       socket.emit(SOCKET_EVENTS.BATTLE_MONITOR.LEFT, {
-        message: `Left battle monitor for eventBossId: ${eventBossId}`,
+        message: "Left battle monitor successfully.",
       });
     } catch (error) {
-      console.error("Error handling battle monitor leave:", error);
+      console.error(
+        "[BattleMonitorHandler] Error handling battle monitor leave:",
+        error
+      );
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: error.message,
       });

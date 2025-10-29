@@ -17,6 +17,11 @@ class MatchmakingManager {
     let player = existingPlayer;
 
     if (!existingPlayer) {
+      if (this.isPlayerInAnyQueue(playerInfo.id)) {
+        console.error("[MatchmakingManager] Player is already in another battle queue.");
+        return null;
+      }
+
       if (this.isNicknameTaken(eventBossId, playerInfo.nickname)) {
         console.error("[MatchmakingManager] Nickname is already taken.");
         return null;
@@ -126,6 +131,15 @@ class MatchmakingManager {
     return this.getBattleQueue(eventBossId).some(
       (player) => player.nickname.toLowerCase() === nickname.toLowerCase()
     );
+  }
+
+  isPlayerInAnyQueue(playerId) {
+    for (const battleQueue of this.battleQueues.values()) {
+      if (battleQueue.some((player) => player.id === playerId)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   getBattleQueue(eventBossId) {

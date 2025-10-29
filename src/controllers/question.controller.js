@@ -23,6 +23,41 @@ const validateAnswerChoices = (answerChoices) => {
   if (correctChoices.length !== 1) {
     throw new ApiError(400, "There must be exactly one correct answer choice.");
   }
+
+  const areOrdersMissing = answerChoices.some(
+    (choice) => typeof choice.order !== "number"
+  );
+  const areOrdersValid = answerChoices.every(
+    (choice) =>
+      typeof choice.order === "number" && Number.isInteger(choice.order)
+  );
+
+  if (areOrdersMissing && !areOrdersValid) {
+    throw new ApiError(400, "Answer choice orders must be integers.");
+  }
+
+  const orders = answerChoices.map((choice) => choice.order);
+  const uniqueOrders = new Set(orders);
+  if (
+    uniqueOrders.size !== orders.length ||
+    !orders.every((o) => o >= 1 && o <= 8)
+  ) {
+    throw new ApiError(
+      400,
+      "Answer choice orders must be unique and between 1 and 8."
+    );
+  }
+};
+
+const assignOrderToChoices = (answerChoices) => {
+  if (answerChoices.every((choice) => typeof choice.order === "number")) {
+    return answerChoices;
+  }
+
+  return answerChoices.map((choice, index) => ({
+    ...choice,
+    order: index + 1,
+  }));
 };
 
 const getAllQuestions = async (req, res, next) => {
@@ -59,7 +94,7 @@ const getQuestionById = async (req, res, next) => {
       throw new ApiError(404, "Question not found.");
     }
 
-    question.answerChoices.sort((a, b) => a.createdAt - b.createdAt);
+    question.answerChoices.sort((a, b) => a.order - b.order);
 
     res.status(200).json(question);
   } catch (error) {
@@ -89,13 +124,15 @@ const createQuestion = async (req, res, next) => {
     );
 
     validateAnswerChoices(answerChoices);
+    const orderedAnswerChoices = assignOrderToChoices(answerChoices);
 
-    for (const choice of answerChoices) {
+    for (const choice of orderedAnswerChoices) {
       await AnswerChoice.create(
         {
           questionId: newQuestion.id,
           text: choice.text,
           isCorrect: choice.isCorrect,
+          order: choice.order,
         },
         { transaction }
       );
@@ -136,6 +173,7 @@ const updateQuestion = async (req, res, next) => {
     }
 
     validateAnswerChoices(answerChoices);
+    const orderedAnswerChoices = assignOrderToChoices(answerChoices);
 
     const updatedFields = {};
     if (categoryId) updatedFields.categoryId = categoryId;
@@ -153,7 +191,8 @@ const updateQuestion = async (req, res, next) => {
         answerChoices.some(
           (newChoice) =>
             newChoice.text === currentChoice.text &&
-            newChoice.isCorrect === currentChoice.isCorrect
+            newChoice.isCorrect === currentChoice.isCorrect &&
+            newChoice.order === currentChoice.order
         )
       );
 
@@ -168,6 +207,7 @@ const updateQuestion = async (req, res, next) => {
             questionId: question.id,
             text: choice.text,
             isCorrect: choice.isCorrect,
+            order: choice.order,
           },
           { transaction }
         );

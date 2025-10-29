@@ -15,7 +15,7 @@ class KnockoutManager {
 
   getKnockoutState(battleSessionId) {
     if (!this.knockoutStates.has(battleSessionId)) {
-      console.error("Knockout session not found");
+      console.error("Knockout session not found.");
       return null;
     }
     return this.knockoutStates.get(battleSessionId);
@@ -23,14 +23,16 @@ class KnockoutManager {
 
   getKnockedOutPlayers(battleSessionId) {
     const knockoutState = this.getKnockoutState(battleSessionId);
-    return knockoutState ? Array.from(knockoutState.knockedOutPlayers.keys()) : [];
+    return knockoutState
+      ? Array.from(knockoutState.knockedOutPlayers.keys())
+      : [];
   }
 
   getKnockedOutPlayerById(battleSessionId, playerId) {
     const knockoutState = this.getKnockoutState(battleSessionId);
     if (!knockoutState?.knockedOutPlayers.has(playerId)) {
       console.error(
-        `Player with ID ${playerId} not found in knockout session`
+        `Player with ID ${playerId} not found in knockout session.`
       );
       return null;
     }
@@ -69,7 +71,7 @@ class KnockoutManager {
       knockoutState.revivalCodes
     );
     if (!revivalCode) {
-      console.error("Failed to generate a unique revival code");
+      console.error("Failed to generate a unique revival code.");
       return null;
     }
 
@@ -77,6 +79,7 @@ class KnockoutManager {
       isKnockedOut: true,
       revivalCode,
       revivalEndAt: Date.now() + GAME_CONSTANTS.REVIVAL_TIMEOUT,
+      timeoutId: null,
     });
     knockoutState.revivalCodes.add(revivalCode);
     return knockoutState.knockedOutPlayers.get(playerId);
@@ -89,19 +92,22 @@ class KnockoutManager {
       revivalCode
     );
 
-    console.log("Knocked out player found for revival code:", knockedOutPlayer);
     let isRevived, reason;
     const isCodeExpired =
-      knockedOutPlayer && this.isRevivalCodeExpired(battleSessionId, revivalCode);
+      knockedOutPlayer &&
+      this.isRevivalCodeExpired(battleSessionId, revivalCode);
     if (knockedOutPlayer && !isCodeExpired) {
       knockedOutPlayer.isKnockedOut = false;
+      if (knockedOutPlayer.timeoutId) clearTimeout(knockedOutPlayer.timeoutId);
       knockoutState.knockedOutPlayers.delete(knockedOutPlayer.id);
       knockoutState.revivalCodes.delete(revivalCode);
       isRevived = true;
       reason = null;
     } else {
       isRevived = false;
-      reason = isCodeExpired ? GAME_CONSTANTS.REVIVAL_CODE.EXPIRED : GAME_CONSTANTS.REVIVAL_CODE.INVALID;
+      reason = isCodeExpired
+        ? GAME_CONSTANTS.REVIVAL_CODE.EXPIRED
+        : GAME_CONSTANTS.REVIVAL_CODE.INVALID;
     }
 
     return {
@@ -128,7 +134,8 @@ class KnockoutManager {
     if (
       !this.isRevivalCodeExpired(battleSessionId, knockedOutPlayer.revivalCode)
     ) {
-      throw new Error("Revival code is not expired");
+      console.error("Revival code is not expired.");
+      return;
     }
     knockoutState.knockedOutPlayers.delete(knockedOutPlayer.id);
     knockoutState.revivalCodes.delete(knockedOutPlayer.revivalCode);
@@ -142,6 +149,18 @@ class KnockoutManager {
         knockoutState.revivalCodes.delete(playerData.revivalCode);
       }
     }
+  }
+
+  removeKnockedOutPlayer(battleSessionId, playerId) {
+    const knockoutState = this.getKnockoutState(battleSessionId);
+    const knockedOutPlayer = this.getKnockedOutPlayerById(
+      battleSessionId,
+      playerId
+    );
+    if (!knockedOutPlayer) return;
+
+    knockoutState.knockedOutPlayers.delete(playerId);
+    knockoutState.revivalCodes.delete(knockedOutPlayer.revivalCode);
   }
 }
 

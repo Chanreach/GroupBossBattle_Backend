@@ -28,6 +28,10 @@ export default {
           defaultValue: false,
           type: Sequelize.BOOLEAN,
         },
+        order: {
+          allowNull: false,
+        type: Sequelize.INTEGER,
+        },
         created_at: {
           allowNull: false,
           defaultValue: Sequelize.fn("NOW"),

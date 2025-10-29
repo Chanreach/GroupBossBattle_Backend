@@ -5,7 +5,11 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import ApiError from "../utils/api-error.util.js";
-import { normalizeName, normalizeText, normalizeInteger } from "../utils/helper.js";
+import {
+  normalizeName,
+  normalizeText,
+  normalizeInteger,
+} from "../utils/helper.js";
 
 const DEFAULT_COOLDOWN_DURATION = 60;
 const DEFAULT_NUMBER_OF_TEAMS = 2;
@@ -62,8 +66,10 @@ const createBoss = async (req, res, next) => {
         name: normalizeName(name),
         image: req.file ? `bosses/${req.file.filename}` : null,
         description: normalizeText(description),
-        cooldownDuration: normalizeInteger(cooldownDuration) || DEFAULT_COOLDOWN_DURATION,
-        numberOfTeams: normalizeInteger(numberOfTeams) || DEFAULT_NUMBER_OF_TEAMS,
+        cooldownDuration:
+          normalizeInteger(cooldownDuration) || DEFAULT_COOLDOWN_DURATION,
+        numberOfTeams:
+          normalizeInteger(numberOfTeams) || DEFAULT_NUMBER_OF_TEAMS,
         creatorId: requesterId,
       },
       { transaction }
@@ -186,9 +192,18 @@ const deleteBoss = async (req, res, next) => {
   const { id } = req.params;
 
   try {
-    const boss = await Boss.findByPk(id);
+    const boss = await Boss.findByPk(id, {
+      include: bossIncludes({ includeEventBosses: true }),
+    });
     if (!boss) {
       throw new ApiError(404, "Boss not found.");
+    }
+
+    if (boss.eventBosses && boss.eventBosses.length > 0) {
+      throw new ApiError(
+        400,
+        "Cannot delete boss associated with active event bosses. Please unassign them first."
+      );
     }
 
     if (boss.image) {

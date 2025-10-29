@@ -141,18 +141,20 @@ class EventBossService {
     try {
       const eventBoss = await EventBoss.findByPk(eventBossId);
       if (!eventBoss) {
-        throw new Error("Event boss not found");
+        console.error("[EventBossService] Event boss not found.");
+        return null;
       }
 
       const spectator = await UserService.getUserById(spectatorId);
       if (!spectator) {
-        throw new Error("Spectator not found");
+        console.error("[EventBossService] Spectator not found.");
+        return null;
       }
 
-      return eventBoss.creatorId === spectator.id || spectator.role === "admin";
+      return eventBoss.creatorId === spectator.id || spectator.role === "admin" || spectator.role === "superadmin";
     } catch (error) {
-      console.error("Error checking spectator permissions:", error);
-      throw error;
+      console.error("[EventBossService] Error checking spectator permissions:", error);
+      return null;
     }
   }
 }

@@ -3,6 +3,7 @@ import { Op } from "sequelize";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import battleSessionManager from "../managers/battle-session.manager.js";
 import ApiError from "../utils/api-error.util.js";
 import { normalizeName, normalizeEmail } from "../utils/helper.js";
 
@@ -125,6 +126,8 @@ const deleteUser = async (req, res, next) => {
         });
       }
     }
+
+    await battleSessionManager.removePlayerFromAllBattleSessions(req.io, id);
 
     await user.destroy();
 

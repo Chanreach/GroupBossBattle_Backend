@@ -47,6 +47,7 @@ export const GAME_CONSTANTS = {
       IDLE: "idle",
       IN_QUEUE: "in-queue",
       IN_BATTLE: "in-battle",
+      IN_PODIUM: "in-podium",
       DISCONNECTED: "disconnected",
     },
 

@@ -23,6 +23,7 @@ export default (sequelize, DataTypes) => {
         status: this.status,
         joinCode: this.joinCode,
         cooldownDuration: this.cooldownDuration,
+        cooldownEndAt: this.cooldownEndAt,
         numberOfTeams: this.numberOfTeams,
         event: this.event ? this.event.getSummary() : null,
       };
@@ -118,6 +119,13 @@ export default (sequelize, DataTypes) => {
             args: [1],
             msg: "Cooldown duration must be at least 1 second.",
           },
+        },
+      },
+      cooldownEndAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        validate: {
+          isDate: { msg: "Cooldown end time must be a valid date." },
         },
       },
       numberOfTeams: {

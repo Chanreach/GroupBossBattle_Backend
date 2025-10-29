@@ -30,6 +30,13 @@ export const SOCKET_EVENTS = {
     UPDATED: "boss-status:updated",
   },
 
+  // ===== PLAYER SESSION EVENTS ===== //
+  PLAYER_SESSION: {
+    REQUEST: "player-session:request",
+    RESPONSE: "player-session:response",
+    UPDATED: "player-session:updated",
+  },
+
   // ===== BOSS PREVIEW EVENTS ===== //
   BOSS_PREVIEW: {
     JOIN: "boss-preview:join",
@@ -116,10 +123,15 @@ export const SOCKET_EVENTS = {
       RECONNECTED: "battle-session:player-reconnected",
       RECONNECT_FAILED: "battle-session:player-reconnect-failed",
       NOT_FOUND: "battle-session:player-not-found",
+      REMOVED: "battle-session:player-removed",
 
       KNOCKED_OUT: "battle-session:player-knocked-out",
       REVIVED: "battle-session:player-revived",
       DEAD: "battle-session:player-dead",
+    },
+
+    PLAYERS: {
+      REMOVED: "battle-session:players-removed",
     },
 
     TEAMMATE: {
@@ -164,11 +176,7 @@ export const SOCKET_EVENTS = {
     REQUEST: "battle-monitor:request",
     RESPONSE: "battle-monitor:response",
     UPDATED: "battle-monitor:updated",
-  },
-
-  // ===== NICKNAME EVENTS ===== //
-  NICKNAME: {
-    VALIDATION: "nickname:validation",
+    UNAUTHORIZED: "battle-monitor:unauthorized",
   },
 
   // ===== BADGE EVENTS ===== //

@@ -4,7 +4,8 @@ class EventService {
   static async getAllEvents() {
     try {
       const events = await Event.findAll();
-      return events;
+      const summaries = events.map((event) => event.getSummary());
+      return summaries;
     } catch (error) {
       console.error("[EventService] Error getting events:", error);
       return null;
@@ -19,7 +20,7 @@ class EventService {
         return null;
       }
 
-      return event;
+      return event.getSummary();
     } catch (error) {
       console.error("[EventService] Error getting event by ID:", error);
       return null;

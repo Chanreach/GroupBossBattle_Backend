@@ -14,8 +14,7 @@ export default (sequelize, DataTypes) => {
         id: this.id,
         text: this.text,
         isCorrect: this.isCorrect,
-        createdAt: this.createdAt,
-        updatedAt: this.updatedAt,
+        order: this.order,
       };
     }
   }
@@ -61,6 +60,14 @@ export default (sequelize, DataTypes) => {
           },
         },
       },
+      order: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        validate: {
+          notEmpty: { msg: "Order cannot be empty." },
+          isInt: { msg: "Order must be an integer." },
+        },
+      }
     },
     {
       sequelize,

@@ -29,7 +29,10 @@ const handleCombat = (io, socket) => {
         data: { currentQuestion },
       });
     } catch (error) {
-      console.error("[CombatHandler] Error retrieving the next question:", error);
+      console.error(
+        "[CombatHandler] Error retrieving the next question:",
+        error
+      );
       socket.emit(SOCKET_EVENTS.ERROR, {
         message: "Internal server error while retrieving the next question.",
       });
@@ -64,7 +67,7 @@ const handleCombat = (io, socket) => {
         });
         return;
       }
-      
+
       const {
         answerResult,
         isPlayerKnockedOut,
@@ -88,12 +91,12 @@ const handleCombat = (io, socket) => {
             data: { answerResult },
           });
 
-        const updateEventBoss = battleSessionManager.getEventBoss(eventBossId);
+        const updatedEventBoss = battleSessionManager.getEventBoss(eventBossId);
         io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
           SOCKET_EVENTS.BATTLE_SESSION.BOSS.DAMAGED,
           {
             data: {
-              eventBoss: updateEventBoss,
+              eventBoss: updatedEventBoss,
               leaderboard: await battleSessionManager.getPreviewLiveLeaderboard(
                 eventBossId
               ),
@@ -122,6 +125,49 @@ const handleCombat = (io, socket) => {
             .emit(SOCKET_EVENTS.BATTLE_SESSION.TEAMMATE.KNOCKED_OUT, {
               message: "A player has been knocked out!",
             });
+
+          if (knockoutInfo.timeoutId) clearTimeout(knockoutInfo.timeoutId);
+          const knockoutTimeout = knockoutInfo.revivalEndAt - Date.now();
+          const timeoutId = setTimeout(() => {
+            const player = battleSessionManager.getPlayerFromBattleSession(
+              eventBossId,
+              playerId
+            );
+            if (!player) return;
+
+            if (
+              battleSessionManager.isPlayerKnockedOut(eventBossId, playerId)
+            ) {
+              battleSessionManager.handleRevivalCodeExpiry(
+                eventBossId,
+                playerId
+              );
+              const socketId = player.socketId;
+              if (!socketId) return;
+
+              io.to(socketId).emit(
+                SOCKET_EVENTS.BATTLE_SESSION.REVIVAL_CODE.EXPIRED_RESPONSE,
+                {
+                  message: "Revival code has expired.",
+                }
+              );
+              io.to(socketId).emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.DEAD, {
+                message: "You are out of the battle.",
+              });
+
+              const { teamId } = battleSessionManager.getPlayerTeamInfo(
+                eventBossId,
+                playerId
+              );
+              io.to(SOCKET_ROOMS.TEAM(eventBossId, teamId))
+                .except(socketId)
+                .emit(SOCKET_EVENTS.BATTLE_SESSION.TEAMMATE.DEAD, {
+                  message: "A teammate is out of the battle.",
+                });
+            }
+          }, knockoutTimeout);
+
+          knockoutInfo.timeoutId = timeoutId;
         }
       }
 
@@ -141,8 +187,7 @@ const handleCombat = (io, socket) => {
             message: "The event boss has been defeated!",
             data: {
               podiumEndAt:
-                battleSessionManager.getBattleSession(eventBossId)
-                  ?.podiumEndAt,
+                battleSessionManager.getBattleSession(eventBossId)?.podiumEndAt,
             },
           }
         );
@@ -157,17 +202,27 @@ const handleCombat = (io, socket) => {
           }
         );
 
-        const updateEventBoss = battleSessionManager.getEventBoss(eventBossId);
+        const updatedEventBoss = battleSessionManager.getEventBoss(eventBossId);
         io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
           SOCKET_EVENTS.BOSS_STATUS.UPDATED,
           {
             data: {
-              eventBoss: updateEventBoss,
+              eventBoss: updatedEventBoss,
             },
           }
         );
 
-        const reactivatedTimeout = updateEventBoss.cooldownEndAt - Date.now();
+        io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.ENDED,
+          {
+            message: "The event boss has been defeated!",
+            data: {
+              eventBoss: updatedEventBoss,
+            },
+          }
+        );
+
+        const reactivatedTimeout = updatedEventBoss.cooldownEndAt - Date.now();
         setTimeout(async () => {
           const reactivatedEventBoss =
             await battleSessionManager.updateEventBossStatus(
@@ -189,6 +244,20 @@ const handleCombat = (io, socket) => {
             {
               data: {
                 sessionSize: 0,
+              },
+            }
+          );
+
+          io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+            SOCKET_EVENTS.BOSS_STATUS.UPDATED,
+            {
+              data: {
+                eventBoss: {
+                  ...reactivatedEventBoss,
+                  currentHP: 0,
+                  maxHP: 0,
+                },
+                activePlayers: 0,
               },
             }
           );

@@ -318,6 +318,13 @@ const handleBattleSession = (io, socket) => {
         return;
       }
 
+      if (battleSessionManager.isPlayerInAnyBattleSession(playerInfo.id)) {
+        socket.emit(SOCKET_EVENTS.ERROR, {
+          message: "You are already in an active battle session.",
+        });
+        return;
+      }
+
       if (
         battleSessionManager.isNicknameTaken(eventBossId, playerInfo.nickname)
       ) {
@@ -348,6 +355,8 @@ const handleBattleSession = (io, socket) => {
         return;
       }
 
+      const countdownEndAt = Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN;
+      response.player.countdownEndAt = countdownEndAt;
       socket.emit(SOCKET_EVENTS.BATTLE_SESSION.MID_GAME.JOINED, {
         message: "Successfully joined mid-game.",
         data: {
@@ -359,7 +368,7 @@ const handleBattleSession = (io, socket) => {
         message: "Battle is starting!",
         data: {
           battleSessionId: response.battleSessionId,
-          countdownEndAt: Date.now() + GAME_CONSTANTS.BATTLE_COUNTDOWN,
+          countdownEndAt,
         },
       });
 

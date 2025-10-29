@@ -34,6 +34,7 @@ export default (sequelize, DataTypes) => {
         numberOfTeams: this.numberOfTeams,
         creatorId: this.creatorId,
         creator: this.creator ? this.creator.getFullProfile() : null,
+        eventBosses: this.eventBosses ? this.eventBosses.map((eventBoss) => eventBoss.getDetails()) : [],
       };
 
       if (this.categories) {

@@ -55,7 +55,7 @@ class EventBossManager {
     eventBoss.status = updatedEventBoss?.status ?? eventBoss.status;
     eventBoss.cooldownEndAt =
       updatedEventBoss?.cooldownEndAt ?? eventBoss.cooldownEndAt;
-    return updatedEventBoss;
+    return updatedEventBoss.getSummary();
   }
 
   isEventBossDefeated(eventBoss) {

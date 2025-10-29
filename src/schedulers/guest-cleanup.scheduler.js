@@ -1,8 +1,9 @@
 import cron from "node-cron";
 import { User } from "../../models/index.js";
 import { Op } from "sequelize";
+import battleSessionManager from "../managers/battle-session.manager.js";
 
-export const startInactiveGuestCleanupScheduler = () => {
+export const startInactiveGuestCleanupScheduler = (io) => {
   // Runs every hour
   cron.schedule("0 * * * *", async () => {
     try {
@@ -16,6 +17,10 @@ export const startInactiveGuestCleanupScheduler = () => {
       const inactiveGuestIds = inactiveGuests.map((guest) => guest.id);
 
       if (inactiveGuestIds.length > 0) {
+        await battleSessionManager.removePlayerFromAllBattleSessions(
+          io,
+          inactiveGuestIds
+        );
         await User.destroy({
           where: { id: { [Op.in]: inactiveGuestIds } },
         });

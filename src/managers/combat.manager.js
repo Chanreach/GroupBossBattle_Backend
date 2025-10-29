@@ -167,6 +167,10 @@ class CombatManager {
     const playerStats = this.getPlayerStats(combatState, playerId);
     Object.assign(playerStats, initializePlayerStats());
   }
+
+  removePlayerStats(combatState, playerId) {
+    combatState.playerStats.delete(playerId);
+  }
 }
 
 export default CombatManager;

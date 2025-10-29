@@ -128,7 +128,7 @@ class LeaderboardService {
             const user = await User.findByPk(entry.userId);
             if (user) {
               username = user.username;
-              profileImage = user.profileImage;
+              profileImage = user.getProfileImageUrl();
             }
           } catch (lookupError) {
             console.warn(
@@ -203,7 +203,7 @@ class LeaderboardService {
             if (user) {
               username = user.username;
               userId = user.id;
-              profileImage = user.profileImage;
+              profileImage = user.getProfileImageUrl();
             }
           } catch (lookupError) {
             console.warn(

@@ -44,7 +44,6 @@ class BadgeManager {
         continue;
       }
       if (totalCorrectAnswers >= milestone.threshold) {
-        console.log(`[BadgeManager] Player ${playerId} is eligible for milestone badge ${milestone.code} with total correct answers: ${totalCorrectAnswers}`);
         return milestone.code;
       }
     }
@@ -52,29 +51,26 @@ class BadgeManager {
   }
 
   async checkHeroBadgeEligibility(playerId, eventId) {
-
     const bossDefeatedBadges = this.getAllPlayerBossDefeatBadges(
       playerId,
       eventId
     );
     if (!bossDefeatedBadges || bossDefeatedBadges.length === 0) {
-      console.log("No boss defeated badges found.");
       return null;
     }
 
     const allEventBosses = await EventBossService.getAllEventBosses(eventId);
     if (!allEventBosses || allEventBosses.length === 0) {
-      console.log("No event bosses found.");
+      console.error("[BadgeManager] No event bosses found.");
       return null;
     }
 
     if (bossDefeatedBadges.length === allEventBosses.length) {
       const shouldAward = bossDefeatedBadges.some((badge) => badge.shouldAward);
       if (!shouldAward) {
-        console.log("Hero badge already awarded.");
+        console.error("[BadgeManager] Hero badge already awarded.");
         return null;
       }
-      console.log("Player is eligible for hero badge.");
       return GAME_CONSTANTS.BADGE_CODES.MILESTONE.HERO;
     }
     return null;
@@ -93,7 +89,6 @@ class BadgeManager {
     }
 
     if (this.hasEarnedBadge(playerBadges, eventId, eventBossId, badge.code)) {
-      console.error("[BadgeManager] Player has already earned this badge.");
       return null;
     }
 
@@ -107,7 +102,7 @@ class BadgeManager {
     if (badgeData) {
       playerBadges.push({ ...badgeData, shouldAward: true });
     } else {
-      console.error("[BadgeManager] Failed to award badge.");
+      console.error(`[BadgeManager] Failed to award badge ${badge.code}.`);
       return null;
     }
 

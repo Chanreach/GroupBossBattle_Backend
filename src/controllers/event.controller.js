@@ -1,6 +1,7 @@
 import { Event, Boss, EventBoss } from "../../models/index.js";
 import { eventIncludes, eventBossIncludes } from "../../models/includes.js";
 import { Op } from "sequelize";
+import eventManager from "../managers/event.manager.js";
 import ApiError from "../utils/api-error.util.js";
 import { generateJoinCode } from "../utils/code.util.js";
 import {
@@ -127,6 +128,8 @@ const updateEvent = async (req, res, next) => {
     if (Object.keys(updatedFields).length > 0) {
       await event.update(updatedFields);
     }
+
+    await eventManager.refreshEvents();
 
     res.status(200).json({
       message: "Event updated successfully!",

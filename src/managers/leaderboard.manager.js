@@ -37,6 +37,7 @@ class LeaderboardManager {
       individualLeaderboard.set(player.id, {
         id: player.id,
         nickname: player.nickname,
+        profileImage: player.profileImage,
         teamId: player.teamId,
         rank: 0,
         totalDamage: 0,
@@ -73,6 +74,19 @@ class LeaderboardManager {
       questionsAnswered: 0,
       accuracy: 0,
     });
+  }
+
+  removePlayerFromLeaderboard(eventBossId, playerId) {
+    const individualLeaderboard = this.individualLeaderboards.get(eventBossId);
+    if (!individualLeaderboard) {
+      console.error(
+        "[LeaderboardManager] No individual leaderboard found for event boss ID:",
+        eventBossId
+      );
+      return;
+    }
+
+    individualLeaderboard.delete(playerId);
   }
 
   getLiveLeaderboard(eventBossId) {
@@ -230,7 +244,7 @@ class LeaderboardManager {
         b.hearts ?? 0,
         b.revivedCount ?? 0,
       ];
-      return compareScores(scoreA, scoreB);
+      return compareScores(scoreB, scoreA);
     });
 
     let currentRank = 1;

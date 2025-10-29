@@ -9,7 +9,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import apiRoutes from "./routes/index.js";
 import errorHandler from "./middleware/error.middleware.js";
-import "./schedulers/index.js";
+import { startEventStatusScheduler, startEventBossStatusScheduler } from "./schedulers/event.scheduler.js";
+import { startInactiveGuestCleanupScheduler } from "./schedulers/guest-cleanup.scheduler.js";
 import eventManager from "./managers/event.manager.js";
 import setupSocket from "./socket/index.js";
 import "./utils/logger.js";
@@ -30,6 +31,13 @@ const bossesDir = path.join(uploadsDir, "bosses");
 
 const app = express();
 const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: [process.env.CORS_ORIGIN, "http://localhost:5173"],
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
 
 app.use(
   cors({
@@ -39,6 +47,10 @@ app.use(
     transports: ["websocket"],
   })
 );
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
@@ -47,17 +59,11 @@ app.use("/api/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/api", apiRoutes);
 app.use(errorHandler);
 
-const io = new Server(server, {
-  cors: {
-    origin: [process.env.CORS_ORIGIN, "http://localhost:5173"],
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
+startEventStatusScheduler();
+startEventBossStatusScheduler();
+startInactiveGuestCleanupScheduler(io);
 
 setupSocket(io);
-
-// Pass socket.io instance to EventManager for real-time updates
 eventManager.setSocketIO(io);
 
 const startServer = async () => {

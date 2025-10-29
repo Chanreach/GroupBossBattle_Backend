@@ -8,9 +8,8 @@ import badgeManager from "../managers/badge.manager.js";
 import leaderboardManager from "./leaderboard.manager.js";
 import EventBossService from "../services/event-boss.service.js";
 import { generateBattleSessionId, compareScores } from "../utils/game.utils.js";
-import { SOCKET_EVENTS } from "../utils/socket.constants.js";
+import { SOCKET_EVENTS, SOCKET_ROOMS } from "../utils/socket.constants.js";
 import { GAME_CONSTANTS } from "../utils/game.constants.js";
-import eventBus from "../utils/event-bus.util.js";
 
 class BattleSessionManager {
   constructor() {
@@ -176,6 +175,13 @@ class BattleSessionManager {
   }
 
   async addPlayerToBattleSession(eventBossId, playerInfo) {
+    if (this.isPlayerInAnyBattleSession(playerInfo.id)) {
+      console.error(
+        "[BattleSessionManager] Player is already in another active battle session."
+      );
+      return null;
+    }
+
     const battleSession = this.getBattleSession(eventBossId);
     if (!battleSession) return null;
 
@@ -508,6 +514,10 @@ class BattleSessionManager {
       }
     }
 
+    for (const player of battleSession.players.values()) {
+      player.contextStatus = GAME_CONSTANTS.PLAYER.CONTEXT_STATUS.IN_PODIUM;
+    }
+
     await this.awardAchievementBadgesToAllPlayers(eventBossId);
     await this.awardHeroBadgesToEligiblePlayers(eventBossId);
 
@@ -555,46 +565,28 @@ class BattleSessionManager {
     const lastHitPlayerId = this.findLastHitPlayerId(battleSession);
     for (const player of battleSession.players.values()) {
       if (player.id === mvpPlayerId) {
-        const badgeData = await this.awardBadgeToPlayer(
+        await this.awardBadgeToPlayer(
           player.id,
           eventBossId,
           battleSession.event.id,
           GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.MVP
         );
-        if (!badgeData) {
-          console.error(
-            "[BattleSessionManager] Failed to award MVP badge to player:",
-            player.id
-          );
-        }
       }
       if (player.teamId === winnerTeamId) {
-        const badgeData = await this.awardBadgeToPlayer(
+        await this.awardBadgeToPlayer(
           player.id,
           eventBossId,
           battleSession.event.id,
           GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.BOSS_DEFEATED
         );
-        if (!badgeData) {
-          console.error(
-            "[BattleSessionManager] Failed to award boss defeated badge to player:",
-            player.id
-          );
-        }
       }
       if (player.id === lastHitPlayerId) {
-        const badgeData = await this.awardBadgeToPlayer(
+        await this.awardBadgeToPlayer(
           player.id,
           eventBossId,
           battleSession.event.id,
           GAME_CONSTANTS.BADGE_CODES.ACHIEVEMENT.LAST_HIT
         );
-        if (!badgeData) {
-          console.error(
-            "[BattleSessionManager] Failed to award last hit badge to player:",
-            player.id
-          );
-        }
       }
     }
   }
@@ -614,18 +606,12 @@ class BattleSessionManager {
         battleSession.event.id
       );
       if (badgeCode) {
-        const badgeData = await this.awardBadgeToPlayer(
+        await this.awardBadgeToPlayer(
           player.id,
           eventBossId,
           battleSession.event.id,
           badgeCode
         );
-        if (!badgeData) {
-          console.error(
-            "[BattleSessionManager] Failed to award hero badge to player:",
-            player.id
-          );
-        }
       }
     }
   }
@@ -715,9 +701,13 @@ class BattleSessionManager {
   handleRevivalCodeExpiry(eventBossId, playerId) {
     const battleSession = this.getBattleSession(eventBossId);
     const player = this.getPlayerFromBattleSession(eventBossId, playerId);
+    if (!battleSession || !player) return;
 
     if (!this.isPlayerKnockedOut(eventBossId, player.id)) {
-      throw new Error("Player is not knocked out.");
+      console.error(
+        "[BattleSessionManager] Cannot handle revival code expiry. Player is not knocked out."
+      );
+      return;
     }
 
     this.knockoutManager.handleRevivalTimeout(battleSession.id, player.id);
@@ -885,7 +875,7 @@ class BattleSessionManager {
       );
     }
     if (
-      player.id === lastHitAward.player.id &&
+      player.id === lastHitAward.player?.id &&
       lastHitAward.badge &&
       lastHitAward.shouldAward
     ) {
@@ -922,7 +912,7 @@ class BattleSessionManager {
       player.id,
       battleSession.event.id,
       null,
-      GAME_CONSTANTS.BADGE_CODES.HERO
+      GAME_CONSTANTS.BADGE_CODES.MILESTONE.HERO
     );
     const heroBadge = this.badgeManager.getBadgeByCode(
       GAME_CONSTANTS.BADGE_CODES.MILESTONE.HERO
@@ -936,7 +926,7 @@ class BattleSessionManager {
         player.id,
         battleSession.event.id,
         null,
-        GAME_CONSTANTS.BADGE_CODES.HERO
+        GAME_CONSTANTS.BADGE_CODES.MILESTONE.HERO
       );
     }
 
@@ -1005,15 +995,7 @@ class BattleSessionManager {
     return player;
   }
 
-  endBattleSessions(eventId) {
-    for (const battleSession of this.battleSessions.values()) {
-      if (battleSession.event.id === eventId) {
-        this.handleEventBossDefeat(battleSession.eventBoss.id);
-      }
-    }
-  }
-
-  async endBattleSessionsGracefully(eventId) {
+  async endBattleSessionsGracefully(io, eventId) {
     for (const battleSession of this.battleSessions.values()) {
       if (battleSession.event.id === eventId) {
         const eventBossId = battleSession.eventBoss.id;
@@ -1029,11 +1011,135 @@ class BattleSessionManager {
             continue;
           }
 
-          eventBus.emit(SOCKET_EVENTS.EVENT.ENDED, {
-            eventBossId: battleSession.eventBoss.id,
-            podiumEndAt: finalizedSession.podiumEndAt,
+          io.to(SOCKET_ROOMS.BATTLE_SESSION(eventBossId)).emit(
+            SOCKET_EVENTS.EVENT.ENDED,
+            {
+              message: "The event has ended. Thank you for participating!",
+              data: { podiumEndAt: battleSession.podiumEndAt },
+            }
+          );
+
+          io.to(SOCKET_ROOMS.BATTLE_MONITOR(eventBossId)).emit(
+            SOCKET_EVENTS.EVENT.ENDED,
+            {
+              message: "The event has ended. Thank you for participating!",
+            }
+          );
+
+          io.to(SOCKET_ROOMS.BOSS_PREVIEW(eventBossId)).emit(
+            SOCKET_EVENTS.EVENT.ENDED,
+            {
+              message: "The event has ended. Thank you for participating!",
+            }
+          );
+        }
+      }
+    }
+  }
+
+  async removePlayerFromAllBattleSessions(io, playerIds = []) {
+    const ids = Array.isArray(playerIds) ? playerIds : [playerIds];
+    for (const battleSession of this.battleSessions.values()) {
+      const removed = [];
+      const socketIds = [];
+      for (const playerId of ids) {
+        if (battleSession.players.has(playerId)) {
+          const player = battleSession.players.get(playerId);
+          const team = this.getPlayerTeamInfo(
+            battleSession.eventBoss.id,
+            playerId
+          );
+          const isKnockedOut = this.isPlayerKnockedOut(
+            battleSession.eventBoss.id,
+            playerId
+          );
+          socketIds.push(player.socketId);
+
+          battleSession.players.delete(playerId);
+          this.teamManager.removePlayerFromTeam(battleSession.teams, playerId);
+          this.combatManager.removePlayerStats(battleSession.combat, playerId);
+          this.leaderboardManager.removePlayerFromLeaderboard(
+            battleSession.eventBoss.id,
+            playerId
+          );
+
+          if (isKnockedOut) {
+            this.knockoutManager.removeKnockedOutPlayer(
+              battleSession.id,
+              playerId
+            );
+
+            const knockedOutPlayers =
+              battleSessionManager.getKnockedOutPlayersByTeam(
+                battleSession.eventBoss.id,
+                team.teamId
+              );
+            io.to(
+              SOCKET_ROOMS.TEAM(battleSession.eventBoss.id, team.teamId)
+            ).emit(SOCKET_EVENTS.BATTLE_SESSION.TEAMMATE.KNOCKED_OUT_COUNT, {
+              message:
+                "Your teammate has been removed from the battle session.",
+              data: {
+                knockedOutPlayersCount: knockedOutPlayers.length,
+              },
+            });
+          }
+          removed.push(playerId);
+        }
+      }
+
+      if (removed.length > 0) {
+        const previewLeaderboard = await this.getPreviewLiveLeaderboard(
+          battleSession.eventBoss.id
+        );
+        const liveLeaderboard = this.getBattleLiveLeaderboard(
+          battleSession.eventBoss.id
+        );
+        const message = `${removed.length} player${
+          removed.length > 1 ? "s" : ""
+        } removed from battle session.`;
+
+        for (const socketId of socketIds) {
+          io.to(socketId).emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.REMOVED, {
+            message: "You have been removed from the battle session.",
           });
         }
+
+        io.to(SOCKET_ROOMS.BATTLE_SESSION(battleSession.eventBoss.id)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.PLAYERS.REMOVED,
+          {
+            message,
+            data: {
+              leaderboard: liveLeaderboard,
+            },
+          }
+        );
+
+        io.to(SOCKET_ROOMS.BATTLE_MONITOR(battleSession.eventBoss.id)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.PLAYERS.REMOVED,
+          {
+            message,
+            data: {
+              leaderboard: previewLeaderboard,
+              activePlayers: this.getActivePlayersCount(
+                battleSession.eventBoss.id
+              ),
+            },
+          }
+        );
+
+        io.to(SOCKET_ROOMS.BOSS_PREVIEW(battleSession.eventBoss.id)).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.PLAYERS.REMOVED,
+          {
+            message,
+            data: {
+              leaderboard: previewLeaderboard,
+              sessionSize: this.getBattleSessionSize(
+                battleSession.eventBoss.id
+              ),
+            },
+          }
+        );
       }
     }
   }
@@ -1109,8 +1215,15 @@ class BattleSessionManager {
   }
 
   findPlayerFromBattleSession(eventBossId, playerId) {
-    const battleSession = this.getBattleSession(eventBossId);
+    const battleSession = this.findBattleSession(eventBossId);
     return battleSession?.players.get(playerId) || null;
+  }
+
+  getAllPlayersFromBattleSession(eventBossId) {
+    const battleSession = this.getBattleSession(eventBossId);
+    if (!battleSession) return [];
+
+    return Array.from(battleSession.players.values());
   }
 
   getPlayerTeamInfo(eventBossId, playerId) {
@@ -1130,8 +1243,8 @@ class BattleSessionManager {
     const battleSession = this.getBattleSession(eventBossId);
     const team = this.teamManager.getTeamById(battleSession.teams, teamId);
     return {
-      teamId: team.id,
-      teamName: team.name,
+      teamId: team?.id,
+      teamName: team?.name,
     };
   }
 
@@ -1165,6 +1278,8 @@ class BattleSessionManager {
 
   getActivePlayersCount(eventBossId) {
     const battleSession = this.getBattleSession(eventBossId);
+    if (!battleSession) return 0;
+
     let count = 0;
     for (const player of battleSession.players.values()) {
       if (player.isConnected) {
@@ -1192,6 +1307,21 @@ class BattleSessionManager {
 
       if (player.nickname.toLowerCase() === nickname.toLowerCase()) {
         return true;
+      }
+    }
+    return false;
+  }
+
+  isPlayerInAnyBattleSession(playerId) {
+    for (const battleSession of this.battleSessions.values()) {
+      if (battleSession.players.has(playerId)) {
+        const player = battleSession.players.get(playerId);
+        if (
+          battleSession.state !== GAME_CONSTANTS.BATTLE_STATE.ENDED &&
+          player.battleState !== GAME_CONSTANTS.PLAYER.BATTLE_STATE.DEAD
+        ) {
+          return true;
+        }
       }
     }
     return false;

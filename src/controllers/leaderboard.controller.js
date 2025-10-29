@@ -1,7 +1,6 @@
 import { Leaderboard, User, Event } from "../../models/index.js";
 import { Op, fn, col, literal } from "sequelize";
 import { compareScores } from "../utils/game.utils.js";
-import { getImageUrl } from "../utils/image.utils.js";
 
 const rankLeaderboard = (entries) => {
   if (!entries || entries.length === 0) return [];
@@ -84,7 +83,7 @@ const getEventAllTimeLeaderboard = async (eventId) => {
           if (user) {
             username = user.username;
             userId = user.id;
-            profileImage = user.profileImage;
+            profileImage = user.getProfileImageUrl();
           }
         } catch (lookupError) {
           console.warn(`Could not resolve player name for ID ${entry.userId}`);
@@ -93,7 +92,7 @@ const getEventAllTimeLeaderboard = async (eventId) => {
           userId,
           eventId: entry.eventId,
           username,
-          profileImage: profileImage ? getImageUrl(profileImage) : null,
+          profileImage,
           totalDamageDealt: Number(entry.get("totalDamageDealt")),
           totalCorrectAnswers: Number(entry.get("totalCorrectAnswers")),
           totalQuestionsAnswered: Number(entry.get("totalQuestionsAnswered")),
