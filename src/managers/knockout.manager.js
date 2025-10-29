@@ -4,6 +4,7 @@ import { generateUniqueRevivalCode } from "../utils/game.utils.js";
 class KnockoutManager {
   constructor() {
     this.knockoutStates = new Map();
+    this.knockoutTimeouts = new Map();
   }
 
   initializeKnockout(battleSessionId) {
@@ -75,13 +76,19 @@ class KnockoutManager {
       return null;
     }
 
+    const timeout = setTimeout(() => {
+      this.handleRevivalTimeout(battleSessionId, playerId);
+      this.knockoutTimeouts.delete(`${battleSessionId}:${playerId}`);
+    }, GAME_CONSTANTS.REVIVAL_TIMEOUT);
+    this.knockoutTimeouts.set(`${battleSessionId}:${playerId}`, timeout);
+
     knockoutState.knockedOutPlayers.set(playerId, {
       isKnockedOut: true,
       revivalCode,
       revivalEndAt: Date.now() + GAME_CONSTANTS.REVIVAL_TIMEOUT,
-      timeoutId: null,
     });
     knockoutState.revivalCodes.add(revivalCode);
+
     return knockoutState.knockedOutPlayers.get(playerId);
   }
 
@@ -98,7 +105,13 @@ class KnockoutManager {
       this.isRevivalCodeExpired(battleSessionId, revivalCode);
     if (knockedOutPlayer && !isCodeExpired) {
       knockedOutPlayer.isKnockedOut = false;
-      if (knockedOutPlayer.timeoutId) clearTimeout(knockedOutPlayer.timeoutId);
+
+      const timeoutKey = `${battleSessionId}:${knockedOutPlayer.id}`;
+      if (this.knockoutTimeouts.has(timeoutKey)) {
+        clearTimeout(this.knockoutTimeouts.get(timeoutKey));
+        this.knockoutTimeouts.delete(timeoutKey);
+      }
+
       knockoutState.knockedOutPlayers.delete(knockedOutPlayer.id);
       knockoutState.revivalCodes.delete(revivalCode);
       isRevived = true;
@@ -139,6 +152,12 @@ class KnockoutManager {
     }
     knockoutState.knockedOutPlayers.delete(knockedOutPlayer.id);
     knockoutState.revivalCodes.delete(knockedOutPlayer.revivalCode);
+
+    const timeoutKey = `${battleSessionId}:${playerId}`;
+    if (this.knockoutTimeouts.has(timeoutKey)) {
+      clearTimeout(this.knockoutTimeouts.get(timeoutKey));
+      this.knockoutTimeouts.delete(timeoutKey);
+    }
   }
 
   handleExpiredRevivalCodes(knockoutState) {
@@ -161,6 +180,12 @@ class KnockoutManager {
 
     knockoutState.knockedOutPlayers.delete(playerId);
     knockoutState.revivalCodes.delete(knockedOutPlayer.revivalCode);
+
+    const timeoutKey = `${battleSessionId}:${playerId}`;
+    if (this.knockoutTimeouts.has(timeoutKey)) {
+      clearTimeout(this.knockoutTimeouts.get(timeoutKey));
+      this.knockoutTimeouts.delete(timeoutKey);
+    }
   }
 }
 

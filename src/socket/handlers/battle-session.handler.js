@@ -179,9 +179,9 @@ const handleBattleSession = (io, socket) => {
         }
       );
     } catch (error) {
-      console.error("[BattleSessionHandler] Error updating leaderboard:", error);
+      console.error("[BattleSessionHandler] Failed to join battle session:", error);
       socket.emit(SOCKET_EVENTS.ERROR, {
-        message: "Internal server error while updating leaderboard.",
+        message: "Internal server error while joining battle session.",
       });
     }
   });

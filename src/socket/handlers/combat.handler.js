@@ -123,18 +123,11 @@ const handleCombat = (io, socket) => {
           socket.broadcast
             .to(SOCKET_ROOMS.TEAM(eventBossId, teamId))
             .emit(SOCKET_EVENTS.BATTLE_SESSION.TEAMMATE.KNOCKED_OUT, {
-              message: "A player has been knocked out!",
+              message: "A teammate has been knocked out!",
             });
 
-          if (knockoutInfo.timeoutId) clearTimeout(knockoutInfo.timeoutId);
           const knockoutTimeout = knockoutInfo.revivalEndAt - Date.now();
-          const timeoutId = setTimeout(() => {
-            const player = battleSessionManager.getPlayerFromBattleSession(
-              eventBossId,
-              playerId
-            );
-            if (!player) return;
-
+          setTimeout(() => {
             if (
               battleSessionManager.isPlayerKnockedOut(eventBossId, playerId)
             ) {
@@ -142,6 +135,13 @@ const handleCombat = (io, socket) => {
                 eventBossId,
                 playerId
               );
+
+              const player = battleSessionManager.getPlayerFromBattleSession(
+                eventBossId,
+                playerId
+              );
+              if (!player) return;
+
               const socketId = player.socketId;
               if (!socketId) return;
 
@@ -166,8 +166,6 @@ const handleCombat = (io, socket) => {
                 });
             }
           }, knockoutTimeout);
-
-          knockoutInfo.timeoutId = timeoutId;
         }
       }
 
