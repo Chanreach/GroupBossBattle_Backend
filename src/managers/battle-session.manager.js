@@ -351,7 +351,13 @@ class BattleSessionManager {
     return questionPool?.currentIndex ?? 0;
   }
 
-  async processPlayerAnswer(eventBossId, playerId, choiceIndex, responseTime) {
+  async processPlayerAnswer(
+    eventBossId,
+    playerId,
+    choiceIndex,
+    responseTime,
+    onKnockoutTimeoutCallback = null
+  ) {
     const battleSession = this.getBattleSession(eventBossId);
     const player = this.getPlayerFromBattleSession(eventBossId, playerId);
     if (!battleSession || !player) return null;
@@ -425,7 +431,11 @@ class BattleSessionManager {
 
     if (answerResult.playerHearts <= 0) {
       player.battleState = GAME_CONSTANTS.PLAYER.BATTLE_STATE.KNOCKED_OUT;
-      this.knockoutManager.addKnockedOutPlayer(battleSession.id, player.id);
+      this.knockoutManager.addKnockedOutPlayer(
+        battleSession.id,
+        player.id,
+        onKnockoutTimeoutCallback
+      );
     }
 
     this.updateBattleLiveLeaderboard(eventBossId, player.id);

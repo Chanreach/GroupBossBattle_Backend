@@ -55,11 +55,43 @@ const handleCombat = (io, socket) => {
     }
 
     try {
+      const handleRevivalTimeout = (battleSessionId, knockedOutPlayerId) => {
+        const player = battleSessionManager.getPlayerFromBattleSession(
+          eventBossId,
+          knockedOutPlayerId
+        );
+        if (!player) return;
+
+        const socketId = player.socketId;
+        if (!socketId) return;
+
+        io.to(socketId).emit(
+          SOCKET_EVENTS.BATTLE_SESSION.REVIVAL_CODE.EXPIRED_RESPONSE,
+          {
+            message: "Revival code has expired.",
+          }
+        );
+        io.to(socketId).emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.DEAD, {
+          message: "You are out of the battle.",
+        });
+
+        const { teamId } = battleSessionManager.getPlayerTeamInfo(
+          eventBossId,
+          knockedOutPlayerId
+        );
+        io.to(SOCKET_ROOMS.TEAM(eventBossId, teamId))
+          .except(socketId)
+          .emit(SOCKET_EVENTS.BATTLE_SESSION.TEAMMATE.DEAD, {
+            message: "A teammate is out of the battle.",
+          });
+      };
+
       const response = await battleSessionManager.processPlayerAnswer(
         eventBossId,
         playerId,
         choiceIndex,
-        responseTime
+        responseTime,
+        handleRevivalTimeout
       );
       if (!response) {
         socket.emit(SOCKET_EVENTS.ERROR, {
@@ -125,47 +157,6 @@ const handleCombat = (io, socket) => {
             .emit(SOCKET_EVENTS.BATTLE_SESSION.TEAMMATE.KNOCKED_OUT, {
               message: "A teammate has been knocked out!",
             });
-
-          const knockoutTimeout = knockoutInfo.revivalEndAt - Date.now();
-          setTimeout(() => {
-            if (
-              battleSessionManager.isPlayerKnockedOut(eventBossId, playerId)
-            ) {
-              battleSessionManager.handleRevivalCodeExpiry(
-                eventBossId,
-                playerId
-              );
-
-              const player = battleSessionManager.getPlayerFromBattleSession(
-                eventBossId,
-                playerId
-              );
-              if (!player) return;
-
-              const socketId = player.socketId;
-              if (!socketId) return;
-
-              io.to(socketId).emit(
-                SOCKET_EVENTS.BATTLE_SESSION.REVIVAL_CODE.EXPIRED_RESPONSE,
-                {
-                  message: "Revival code has expired.",
-                }
-              );
-              io.to(socketId).emit(SOCKET_EVENTS.BATTLE_SESSION.PLAYER.DEAD, {
-                message: "You are out of the battle.",
-              });
-
-              const { teamId } = battleSessionManager.getPlayerTeamInfo(
-                eventBossId,
-                playerId
-              );
-              io.to(SOCKET_ROOMS.TEAM(eventBossId, teamId))
-                .except(socketId)
-                .emit(SOCKET_EVENTS.BATTLE_SESSION.TEAMMATE.DEAD, {
-                  message: "A teammate is out of the battle.",
-                });
-            }
-          }, knockoutTimeout);
         }
       }
 

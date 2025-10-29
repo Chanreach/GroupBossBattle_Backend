@@ -60,7 +60,7 @@ class KnockoutManager {
       : null;
   }
 
-  addKnockedOutPlayer(battleSessionId, playerId) {
+  addKnockedOutPlayer(battleSessionId, playerId, onTimeoutCallback = null) {
     const knockoutState = this.getKnockoutState(battleSessionId);
     if (!knockoutState) {
       return null;
@@ -76,8 +76,19 @@ class KnockoutManager {
       return null;
     }
 
+    const timeoutKey = `${battleSessionId}:${playerId}`;
+    if (this.knockoutTimeouts.has(timeoutKey)) {
+      clearTimeout(this.knockoutTimeouts.get(timeoutKey));
+      this.knockoutTimeouts.delete(timeoutKey);
+    }
+
     const timeout = setTimeout(() => {
       this.handleRevivalTimeout(battleSessionId, playerId);
+
+      if (onTimeoutCallback && typeof onTimeoutCallback === "function") {
+        onTimeoutCallback(battleSessionId, playerId);
+      }
+
       this.knockoutTimeouts.delete(`${battleSessionId}:${playerId}`);
     }, GAME_CONSTANTS.REVIVAL_TIMEOUT);
     this.knockoutTimeouts.set(`${battleSessionId}:${playerId}`, timeout);
