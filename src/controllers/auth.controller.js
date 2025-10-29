@@ -25,6 +25,8 @@ const signup = async (req, res, next) => {
   }
 };
 
+// TESTING
+
 const login = async (req, res, next) => {
   const { emailOrUsername, password } = req.body;
 
