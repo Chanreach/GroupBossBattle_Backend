@@ -144,9 +144,23 @@ const deleteEvent = async (req, res, next) => {
   const { id } = req.params;
 
   try {
-    const event = await Event.findByPk(id);
+    const event = await Event.findByPk(id, {
+      include: eventIncludes({ includeEventBosses: true }),
+    });
     if (!event) {
       throw new ApiError(404, "Event not found.");
+    }
+
+    if (event.eventBosses && event.eventBosses.length > 0) {
+      for (const eventBoss of event.eventBosses) {
+        if (eventBoss.status === "in-battle") {
+          throw new ApiError(
+            400,
+            "Cannot delete an event with event bosses that are currently in battle."
+          );
+        }
+        await eventBoss.destroy();
+      }
     }
 
     await event.destroy();
@@ -298,6 +312,13 @@ const unassignBossFromEvent = async (req, res, next) => {
     }
 
     const results = { success: [], failed: [] };
+    if (event.status === "ongoing") {
+      throw new ApiError(
+        400,
+        "Cannot unassign event bosses from an ongoing event."
+      );
+    }
+
     for (const eventBoss of eventBosses) {
       if (eventBoss.status === "in-battle") {
         results.failed.push({

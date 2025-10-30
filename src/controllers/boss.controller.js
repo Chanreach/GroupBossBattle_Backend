@@ -191,19 +191,26 @@ const updateBoss = async (req, res, next) => {
 const deleteBoss = async (req, res, next) => {
   const { id } = req.params;
 
+  const transaction = await sequelize.transaction();
   try {
     const boss = await Boss.findByPk(id, {
-      include: bossIncludes({ includeEventBosses: true }),
+      include: bossIncludes({ includeEventBosses: true, includeEvent: true }),
+      transaction,
     });
     if (!boss) {
       throw new ApiError(404, "Boss not found.");
     }
 
     if (boss.eventBosses && boss.eventBosses.length > 0) {
-      throw new ApiError(
-        400,
-        "Cannot delete boss associated with active event bosses. Please unassign them first."
+      const completedEvents = boss.eventBosses.filter(
+        (eb) => eb.event && eb.event.status === "completed"
       );
+      if (completedEvents.length <= 0) {
+        throw new ApiError(
+          400,
+          "Cannot delete boss associated with active event bosses. Please unassign them first."
+        );
+      }
     }
 
     if (boss.image) {
@@ -219,10 +226,16 @@ const deleteBoss = async (req, res, next) => {
       }
     }
 
-    await boss.destroy();
+    boss.eventBosses.forEach(async (eventBoss) => {
+      await eventBoss.destroy({ transaction });
+    });
+    await boss.destroy({ transaction });
+
+    await transaction.commit();
 
     res.status(204).send();
   } catch (error) {
+    await transaction.rollback();
     next(error);
   }
 };

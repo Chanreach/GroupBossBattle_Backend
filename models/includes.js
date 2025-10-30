@@ -59,6 +59,7 @@ export const eventIncludes = ({
 export const bossIncludes = ({
   includeCreator = false,
   includeEventBosses = false,
+  includeEvent = false,
   includeCategories = false,
   includeQuestions = false,
   includeAnswerChoices = false,
@@ -66,7 +67,15 @@ export const bossIncludes = ({
   const includes = [];
 
   if (includeCreator) includes.push(...creatorInclude);
-  if (includeEventBosses) includes.push(...eventBossesInclude);
+  if (includeEventBosses) {
+    const eventBossesAssoc = { ...eventBossesInclude[0] };
+    eventBossesAssoc.include = [];
+
+    if (includeEvent) {
+      eventBossesAssoc.include.push(...eventInclude);
+    }
+    includes.push(eventBossesAssoc);
+  }
 
   if (includeCategories) {
     const categoriesAssoc = { ...categoriesInclude[0] };
